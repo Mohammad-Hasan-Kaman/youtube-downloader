@@ -1,0 +1,8 @@
+# YouTube Downloader - Dependencies
+# Core
+customtkinter>=5.2.0
+yt-dlp>=2024.1.0
+browser-cookie3>=0.22.0
+
+# Standard library (no install needed)
+# tkinter, threading, os, re, json, time, datetime, traceback, sys, tempfile, filedialog, messagebox

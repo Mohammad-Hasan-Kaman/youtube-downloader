@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Environment variables
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.exe
+dist/
+build/
+*.spec
+
+# Logs
+*.log
+
+# ffmpeg binary (large, not for repo)
+ffmpeg.exe
+
+# Database
+*.sqlite3
+db.sqlite3
