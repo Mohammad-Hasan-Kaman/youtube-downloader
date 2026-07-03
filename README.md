@@ -31,7 +31,7 @@
 
 | Main Interface | Quality Selection | Download Progress |
 |:---:|:---:|:---:|
-| ![Main UI](assets/screenshot_main.png) | ![Quality](assets/screenshot_quality.png) | ![Progress](assets/screenshot_progress.png) |
+| ![Main UI](assets/screenshot_main.svg) | ![Quality](assets/screenshot_quality.svg) | ![Progress](assets/screenshot_progress.svg) |
 
 *(Placeholders shown - replace with actual screenshots after first run)*
 
@@ -172,8 +172,8 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 
 **Mohammad Hasan Kaman**  
 - 🌐 **GitHub:** [@Mohammad-Hasan-Kaman](https://github.com/Mohammad-Hasan-Kaman)  
-- 💼 **LinkedIn:** [Profile](https://linkedin.com/in/mohammad-hasan-kaman)  
-- 📧 **Email:** [Your Email Here](mailto:your.email@example.com)  
+- 💼 **LinkedIn:** [Kaman Programmer](https://www.linkedin.com/in/kaman-programmer)  
+- 📧 **Email:** [mohammadhasankaman@gmail.com](mailto:mohammadhasankaman@gmail.com)  
 
 I'm a 17-year-old Full-Stack Developer enthusiast passionate about Python, AI, and building practical tools. This project is part of my journey to become a professional developer.
 
