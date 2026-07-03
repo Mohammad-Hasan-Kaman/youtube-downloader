@@ -1,0 +1,9 @@
+# assets/
+# Screenshots and icons will be placed here
+# Please add screenshots after running the application:
+# - screenshot_main.png (Main UI)
+# - screenshot_quality.png (Quality Selection)
+# - screenshot_progress.png (Download Progress)
+*
+
+assets/.gitkeep
