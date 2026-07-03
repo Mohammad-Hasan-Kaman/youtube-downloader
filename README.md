@@ -1,106 +1,109 @@
-# 🎬 YouTube Downloader Pro — دانلودر پیشرفته یوتیوب
+# 🎬 YouTube Downloader Pro - Advanced Video & Audio Downloader
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey)]()
-[![Stars](https://img.shields.io/github/stars/USERNAME/youtube-downloader?style=social)](https://github.com/USERNAME/youtube-downloader/stargazers)
+[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)](https://python.org)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Mohammad-Hasan-Kaman/youtube-downloader?style=social)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader)
 
-> **دانلودر حرفه‌ای یوتیوب با رابط کاربری مدرن فارسی، نوار پیشرفت زنده، پشتیبانی از کوکی مرورگر و انتخاب کیفیت دقیق**  
-> ساخته شده با ❤️ با **Python**، **CustomTkinter** و **yt-dlp**
-
----
-
-## ✨ ویژگی‌ها
-
-| ویژگی | توضیح |
-|-----------|---------|
-| 🎨 **رابط فارسی RTL** | کاملاً راست‌چین، فونت تاهما، تم تاریک/روشن |
-| 📊 **نوار پیشرفت سه‌مرحله** | دریافت اطلاعات → پردازش → دانلود (با سرعت، زمان باقی‌مانده، حجم) |
-| 🔐 **کوکی مرورگر** | عبور از محدودیت یوتیوب (Sign in to confirm) با Chrome/Firefox/Edge/Opera/Brave |
-| 🎯 **انتخاب کیفیت دقیق** | ویدیو + صدا جداگانه، فقط صدا (MP3)، فقط ویدیو، همه فرمت‌ها |
-| 📁 **مسیر ذخیره سفارشی** | انتخاب پوشه مقصد با مرورگر فایل |
-| 🧵 **تعدد نخ (Threading)** | رابط کاربری همیشه پاسخگو، دانلود در پس‌زمینه |
-| 🛡 **مدیریت خطا** | لاگ کامل، پیام‌های دوستانه، تلاش مجدد خودکار |
-| 📦 **بدون نصب اضافه** | فقط Python + pip install -r requirements.txt |
+> **Professional YouTube downloader with a modern Persian RTL interface, live progress tracking, browser cookie support, and precise quality selection.**  
+> Built with ❤️ using **Python**, **CustomTkinter**, and **yt-dlp**.
 
 ---
 
-## 📸 اسکرین‌شات‌ها
+## ✨ Features
 
-| رابط اصلی | انتخاب کیفیت | پیشرفت دانلود |
+| Feature | Description |
+|:---|:---|
+| 🎨 **Modern Persian UI** | Fully RTL interface,Tahoma font, Dark/Light themes |
+| 📊 **3-Stage Progress** | Fetching → Processing → Download (with speed, time, size) |
+| 🔐 **Browser Cookies** | Bypass "Sign in to confirm" restrictions (Chrome/Firefox/Edge/Opera/Brave) |
+| 🎯 **Precise Quality** | Video+Audio, Audio-only (MP3), Video-only, All formats |
+| 📁 **Custom Save Path** | Choose any folder for downloads |
+| 🧵 **Multi-threaded** | Non-blocking GUI, smooth performance |
+| 🛡 **Error Handling** | Comprehensive logging, user-friendly messages, auto-retry |
+| 📦 **Zero Config** | Just `pip install -r requirements.txt` and run |
+
+---
+
+## 📸 Screenshots
+
+> *Note: Screenshots will be added to `assets/` folder. Running the app once will help capture these.*
+
+| Main Interface | Quality Selection | Download Progress |
 |:---:|:---:|:---:|
 | ![Main UI](assets/screenshot_main.png) | ![Quality](assets/screenshot_quality.png) | ![Progress](assets/screenshot_progress.png) |
 
-> **نکته:** پوشه `assets/` و عکس‌ها را بعد از اولین اجرا بسازید و اسکرین‌شات بگیرید.
+*(Placeholders shown - replace with actual screenshots after first run)*
 
 ---
 
-## 🚀 نصب و اجرا
+## 🚀 Installation & Setup
 
-### پیش‌نیازها
-- **Python 3.10+** ([دانلود](https://python.org/downloads))
-- **Git**ffmpeg** در PATH سیستم (برای ادغام ویدیو+صدا)  
-  - Windows: `winget install Gyan.FFmpeg` یا از [ffmpeg.org](https://ffmpeg.org/download.html)  
-  - Linux: `sudo apt install ffmpeg`  
-  - macOS: `brew install ffmpeg`
+### Prerequisites
+- **Python 3.10+** ([Download](https://python.org/downloads))
+- **Git** (optional, for cloning)
+- **FFmpeg** (required for video+audio merging)
+  - **Windows:** `winget install Gyan.FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org)
+  - **Linux:** `sudo apt install ffmpeg` or `sudo dnf install ffmpeg`
+  - **macOS:** `brew install ffmpeg`
 
-### مراحل نصب
+### Quick Start
 ```bash
-# ۱. کلون مخزن
-git clone https://github.com/USERNAME/youtube-downloader.git
+# 1. Clone the repository
+git clone https://github.com/Mohammad-Hasan-Kaman/youtube-downloader.git
 cd youtube-downloader
 
-# ۲. محیط مجازی (توصیه شده)
+# 2. Create a virtual environment (recommended)
 python -m venv venv
 # Windows:
 venv\Scripts\activate
 # Linux/macOS:
 source venv/bin/activate
 
-# ۳. نصب وابستگی‌ها
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# ۴. اجرا
+# 4. Run the application
 python youtube_downloader.py
 ```
 
-### اجرا به صورت فایل اجرایی (اختیاری)
+### Build as Executable (Optional)
 ```bash
 pip install pyinstaller
 pyinstaller --onefile --windowed --icon=assets/icon.ico --add-data "assets;assets" youtube_downloader.py
-# فایل در dist/youtube_downloader.exe ساخته می‌شود
+# Output: dist/youtube_downloader.exe (Windows) or dist/youtube_downloader (Linux/macOS)
 ```
 
 ---
 
-## 📖 راهنمای استفاده
+## 📖 How to Use
 
-1. **لینک را کپی کنید** — از یوتیوب (watch, youtu.be, shorts, playlist)
-2. **در برنامه Paste کنید** — دکمه 📋 یا Ctrl+V
-3. **دریافت اطلاعات** — کلیک روی 🔍 «دریافت اطلاعات ویدیو»
-4. **کیفیت را انتخاب کنید** — از لیست فرمت‌ها (ویدیو+صدا، فقط صدا، فقط ویدیو)
-5. **پوشه مقصد را تنظیم کنید** — پیش‌فرض: `~/Downloads`
-6. **شروع دانلود** — دکمه ⬇️ «شروع دانلود»
-7. **پیشرفت را تماشا کنید** — نوارهای سه‌گانه، سرعت، زمان باقی‌مانده
+1. **Copy URL** — Copy YouTube link (watch, youtu.be, shorts, or playlist)
+2. **Paste Link** — Click 📋 button or press Ctrl+V in the input field
+3. **Fetch Info** — Click 🔍 "Get Video Info" button
+4. **Choose Quality** — Select from the dropdown (Video+Audio, Audio-only, etc.)
+5. **Set Path** — Choose download folder (default: `~/Downloads`)
+6. **Start Download** — Click ⬇️ "Start Download"
+7. **Monitor Progress** — Watch 3 progress bars, speed, ETA, and file size
 
-### 🔐 کوکی مرورگر (برای ویدیوهای محدودیت‌دار)
-- تیک ✅ «استفاده از کوکی مرورگر» را بزنید
-- مرورگر مورد نظر را انتخاب کنید (Chrome پیش‌فرض)
-- **مهم:** در آن مرورگر باید **به یوتیوب لاگین کرده باشید**
+### 🔐 Using Browser Cookies (for restricted videos)
+- Check ✅ "Use Browser Cookies"
+- Select your browser (Chrome is default)
+- **Important:** Be logged into YouTube in that browser before running
 
 ---
 
-## 🛠 ساختار پروژه
+## 🏗 Project Structure
 
 ```
 youtube-downloader/
-├── youtube_downloader.py    # کد اصلی برنامه (GUI + Logic)
-├── requirements.txt         # وابستگی‌های پایتون
-├── .gitignore              # فایل‌های نادیده‌گرفته‌شده
-├── LICENSE                 # مجوز MIT
-├── README.md               # همین فایل
-└── assets/                 # آیکون، اسکرین‌شات‌ها (اختیاری)
-    ├── icon.ico
+├── youtube_downloader.py    # Main application (GUI + Core Logic)
+├── requirements.txt         # Python dependencies
+├── .gitignore              # Git ignore rules
+├── LICENSE                 # MIT License
+├── README.md               # This file
+└── assets/                 # Images, icons, screenshots
+    ├── icon.ico            # App icon (optional)
     ├── screenshot_main.png
     ├── screenshot_quality.png
     └── screenshot_progress.png
@@ -108,82 +111,81 @@ youtube-downloader/
 
 ---
 
-## ⚙️ تنظیمات پیشرفته
+## ⚙️ Advanced Configuration
 
-### متغیرهای محیطی (اختیاری)
-فایل `.env` بسازید:
+### Environment Variables (Optional)
+Create a `.env` file in the root:
 ```env
-# مسیر پیش‌فرض دانلود
 DEFAULT_DOWNLOAD_PATH=D:\Videos\YouTube
-
-# مرورگر پیش‌فرض برای کوکی
 DEFAULT_BROWSER=chrome
-
-# تم پیش‌فرض (dark/light)
 DEFAULT_THEME=dark
 ```
 
-### سفارشی‌سازی تم
-در کد (`youtube_downloader.py`):
-```python
-ctk.set_appearance_mode("dark")  # "light" یا "system"
-ctk.set_default_color_theme("blue")  # "green", "dark-blue", ...
-```
+### Customization
+- **Theme:** Modify `youtube_downloader.py`:
+  ```python
+  ctk.set_appearance_mode("dark")  # Options: "light", "dark", "system"
+  ctk.set_default_color_theme("blue")  # Options: "blue", "green", "dark-blue"
+  ```
 
 ---
 
-## 🐛 عیب‌یابی رایج
+## 🐛 Troubleshooting
 
-| خطا | راه‌حل |
-|------|--------|
-| `ffmpeg not found` | ffmpeg را نصب و به PATH اضافه کنید |
-| `Sign in to confirm you're not a bot` | کوکی مرورگر را فعال کنید، VPN خاموش کنید |
-| `ModuleNotFoundError: customtkinter` | `pip install -r requirements.txt` را اجرا کنید |
-| دانلود متوقف می‌شود | اینترنت چک کنید، فرمت پایین‌تر انتخاب کنید |
-| ارور 403/429 | کوکی معتبر، عدم استفاده از VPN، صبر چند دقیقه |
-
----
-
-## 🤝 مشارکت (Contributing)
-
-1. Fork کنید
-2. شاخه بسازید: `git checkout -b feature/amazing-feature`
-3. کامیت کنید: `git commit -m 'Add amazing feature'`
-4. Push کنید: `git push origin feature/amazing-feature`
-5. **Pull Request** باز کنید
-
-ایده‌ها:
-- پشتیبانی از پلی‌لیست و کانال
-- صف دانلود (Queue)
-- زمان‌بندی دانلود
-- تبدیل خودکار به فرمت‌های دیگر
-- لاگینگ به فایل
+| Issue | Solution |
+|:---|:---|
+| `ffmpeg not found` | Install FFmpeg and add to PATH |
+| `Sign in to confirm` | Enable browser cookies, disable VPN |
+| `ModuleNotFoundError` | Run `pip install -r requirements.txt` |
+| Download stalls | Check internet, try lower quality |
+| Error 403/429 | Refresh cookies, avoid VPN, wait a few minutes |
+| Slow download | Check connection, try stable download speed |
 
 ---
 
-## 📄 مجوز (License)
+## 🤝 Contributing
 
-این پروژه تحت مجوز **MIT License** منتشر شده است.  
-فایل [LICENSE](LICENSE) را ببینید.
+Contributions are welcome! Here's how you can help:
 
----
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/awesome-feature`
+3. Commit your changes: `git commit -m 'Add awesome feature'`
+4. Push to the branch: `git push origin feature/awesome-feature`
+5. Open a Pull Request
 
-## 👨‍💻 نویسنده
-
-**Mohammad Hasan**  
-- GitHub: [@USERNAME](https://github.com/USERNAME)  
-- LinkedIn: [Your Profile](https://linkedin.com/in/yourprofile)  
-- Email: your.email@example.com
-
----
-
-## ⭐ حمایت کنید
-
-اگر این پروژه برایتان مفید بود، **ستاره دهید** و به دیگران معرفی کنید!  
-این انگیزه من برای ادامه توسعه است.
-
-[![Star History Chart](https://api.star-history.com/svg?repos=USERNAME/youtube-downloader&type=Date)](https://star-history.com/#USERNAME/youtube-downloader&Date)
+**Ideas for contribution:**
+- Playlist & Channel download support
+- Download queue manager
+- Scheduled downloads
+- Format converter
+- Log file export
 
 ---
 
-> **نکته:** این ابزار تنها برای استفاده شخصی و آموزشی است. کپی‌رایت محتوای یوتیوب را محترم بمانید.
+## 📄 License
+
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+---
+
+## 👨‍💻 About the Author
+
+**Mohammad Hasan Kaman**  
+- 🌐 **GitHub:** [@Mohammad-Hasan-Kaman](https://github.com/Mohammad-Hasan-Kaman)  
+- 💼 **LinkedIn:** [Profile](https://linkedin.com/in/mohammad-hasan-kaman)  
+- 📧 **Email:** [Your Email Here](mailto:your.email@example.com)  
+
+I'm a 17-year-old Full-Stack Developer enthusiast passionate about Python, AI, and building practical tools. This project is part of my journey to become a professional developer.
+
+---
+
+## ⭐ Support the Project
+
+If you find this tool useful, please **give it a star**! ⭐  
+Your support motivates me to keep improving and adding new features.
+
+[![Star History](https://api.star-history.com/svg?repos=Mohammad-Hasan-Kaman/youtube-downloader&type=Date)](https://star-history.com/#Mohammad-Hasan-Kaman/youtube-downloader&Date)
+
+---
+
+> **Disclaimer:** This tool is for personal and educational use only. Please respect YouTube's Terms of Service and content creators' copyright.
