@@ -187,5 +187,6 @@ Your support motivates me to keep improving and adding new features.
 [![Star History](https://api.star-history.com/svg?repos=Mohammad-Hasan-Kaman/youtube-downloader&type=Date)](https://star-history.com/#Mohammad-Hasan-Kaman/youtube-downloader&Date)
 
 ---
+*Maintained by Mohammad Hasan Kaman | Last updated: July 2026*
 
 > **Disclaimer:** This tool is for personal and educational use only. Please respect YouTube's Terms of Service and content creators' copyright.
