@@ -3,7 +3,6 @@
 > یک دانلودر پیشرفته یوتیوب با رابط کاربری مدرن فارسی (RTL)، پشتیبانی از نوار پیشرفت زنده و انتخاب دقیق کیفیت و فرمت.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)](https://python.org)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/Mohammad-Hasan-Kaman/youtube-downloader?color=blue)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/releases)
 
