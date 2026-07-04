@@ -1,192 +1,140 @@
-# 🎬 YouTube Downloader Pro - Advanced Video & Audio Downloader
+# 🎬 YouTube Downloader Pro
+
+> یک دانلودر پیشرفته یوتیوب با رابط کاربری مدرن فارسی (RTL)، پشتیبانی از نوار پیشرفت زنده و انتخاب دقیق کیفیت و فرمت.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Mohammad-Hasan-Kaman/youtube-downloader?style=social)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader)
-
-> **Professional YouTube downloader with a modern Persian RTL interface, live progress tracking, browser cookie support, and precise quality selection.**  
-> Built with ❤️ using **Python**, **CustomTkinter**, and **yt-dlp**.
+[![Release](https://img.shields.io/github/v/release/Mohammad-Hasan-Kaman/youtube-downloader?color=blue)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/releases)
 
 ---
 
-## ✨ Features
+## 🚀 هدف و مخاطبان
 
-| Feature | Description |
-|:---|:---|
-| 🎨 **Modern Persian UI** | Fully RTL interface,Tahoma font, Dark/Light themes |
-| 📊 **3-Stage Progress** | Fetching → Processing → Download (with speed, time, size) |
-| 🔐 **Browser Cookies** | Bypass "Sign in to confirm" restrictions (Chrome/Firefox/Edge/Opera/Brave) |
-| 🎯 **Precise Quality** | Video+Audio, Audio-only (MP3), Video-only, All formats |
-| 📁 **Custom Save Path** | Choose any folder for downloads |
-| 🧵 **Multi-threaded** | Non-blocking GUI, smooth performance |
-| 🛡 **Error Handling** | Comprehensive logging, user-friendly messages, auto-retry |
-| 📦 **Zero Config** | Just `pip install -r requirements.txt` and run |
+این پروژه با رویکرد **"دسترسی آسان بدون نیاز به دانش فنی"** طراحی شده است:
+
+| مخاطب | روش استفاده |
+|-------|--------------|
+| **کاربران عادی** | دانلود و اجرای مستقیم فایل `.exe` (بدون نیاز به نصب پایتون یا کتابخانه‌ها). |
+| **توسعه‌دهندگان** | کپی کردن سورس کد و اجرای مستقیم با `python` برای مطالعه یا توسعه بیشتر. |
 
 ---
 
-## 📸 Screenshots
+## ✨ ویژگی‌های کلیدی
 
-> *Note: Screenshots will be added to `assets/` folder. Running the app once will help capture these.*
-
-| Main Interface | Quality Selection | Download Progress |
-|:---:|:---:|:---:|
-| ![Main UI](assets/screenshot_main.svg) | ![Quality](assets/screenshot_quality.svg) | ![Progress](assets/screenshot_progress.svg) |
-
-*(Placeholders shown - replace with actual screenshots after first run)*
+- 🎨 **رابط کاربری مدرن فارسی (RTL):** طراحی تمیز، حالت تاریک (Dark Mode) به صورت پیش‌فرض.
+- 📊 **نمایش زنده پیشرفت (3 مرحله):**
+  1.  **FETCHING:** دریافت اطلاعات ویدیو.
+  2.  **PROCESSING:** انتخاب کیفیت و آماده‌سازی.
+  3.  **DOWNLOADING:** دانلود با نمایش سرعت و زمان باقی‌مانده (ETA).
+- 🎯 **انتخاب دقیق کیفیت و فرمت:**
+  - **ویدیو + صدا:** نسخه‌های 1080p, 720p, 480p و...
+  - **فقط صدا:** تبدیل به MP3/MP4 با نرخ نمونه‌برداری مشخص (128kbps, 192kbps, 256kbps).
+  - **فقط ویدیو:** دانلود بدون صدا.
+- 🔐 **پشتیبانی از کوکی مرورگر:** دور زدن محدودیت‌های IP یا دانلود ویدیوهای Private با استخراج خودکار کوکی‌های کروم/فایرفاکس.
+- 📁 **مسیر دلخواه:** انتخاب پوشه مقصد برای ذخیره دانلودها.
+- 🧵 **چند رشته‌ای (Multi-threaded):** مدیریت همزمان دانلودها بدون قفل شدن رابط کاربری.
+- 🛡 **مدیریت خطاهای پیشرفته:** نمایش پیام‌های خطای واضح و قابل فهم.
 
 ---
 
-## 🚀 Installation & Setup
+## 📥 نصب و اجرا
 
-### Prerequisites
-- **Python 3.10+** ([Download](https://python.org/downloads))
-- **Git** (optional, for cloning)
-- **FFmpeg** (required for video+audio merging)
-  - **Windows:** `winget install Gyan.FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org)
-  - **Linux:** `sudo apt install ffmpeg` or `sudo dnf install ffmpeg`
-  - **macOS:** `brew install ffmpeg`
+### ۱. برای کاربران عادی (بدون نیاز به پایتون)
+1.  به بخش [Releases](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/releases) بروید.
+2.  آخرین نسخه (`v1.0.0` یا بالاتر) را دانلود کنید.
+3.  فایل `YouTube-Downloader-Pro.exe` را اجرا کنید.
+4.  لینک را وارد کنید و دانلود را شروع کنید!
 
-### Quick Start
+### ۲. برای توسعه‌دهندگان (از سورس کد)
 ```bash
-# 1. Clone the repository
+# کلون کردن مخزن
 git clone https://github.com/Mohammad-Hasan-Kaman/youtube-downloader.git
-cd youtube-downloader
+cd youtube_downloader
 
-# 2. Create a virtual environment (recommended)
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/macOS:
-source venv/bin/activate
-
-# 3. Install dependencies
+# نصب وابستگی‌ها (فقط در صورتی که پایتون دارید)
 pip install -r requirements.txt
 
-# 4. Run the application
+# اجرای برنامه
 python youtube_downloader.py
 ```
 
-### Build as Executable (Optional)
-```bash
-pip install pyinstaller
-pyinstaller --onefile --windowed --icon=assets/icon.ico --add-data "assets;assets" youtube_downloader.py
-# Output: dist/youtube_downloader.exe (Windows) or dist/youtube_downloader (Linux/macOS)
+---
+
+## 🛠 تکنولوژی‌های استفاده شده
+
+| تکنولوژی | نقش |
+|-----------|-----|
+| **Python 3.10+** | زبان برنامه‌نویسی اصلی |
+| **CustomTkinter** | رابط کاربری مدرن و زیبا |
+| **yt-dlp** | هسته دانلود و استخراج اطلاعات |
+| **browser-cookie3** | استخراج کوکی‌های مرورگر |
+
+---
+
+## 📸 تصاویری از برنامه
+
+*(تصاویر SVG با کیفیت بالا که چیدمان و ویژگی‌های برنامه را نشان می‌دهند)*
+
+<div align="center">
+
+| صفحه اصلی (Home) | انتخاب کیفیت (Quality) | پیشرفت دانلود (Progress) |
+|:---:|:---:|:---:|
+| <img src="assets/screenshot_home.svg" width="300" alt="Home Screen"/> | <img src="assets/screenshot_quality.svg" width="300" alt="Quality Selection"/> | <img src="assets/screenshot_progress.svg" width="300" alt="Download Progress"/> |
+
+*افزایش کیفیت تصاویر با کلیک روی آن‌ها*
+
+</div>
+
+---
+
+## 📝 راهنمای استفاده
+
+1.  **وارد کردن لینک:** لینک ویدیو را در کادر متنی وارد کنید.
+2.  **دریافت اطلاعات:** روی دکمه **"دریافت اطلاعات"** کلیک کنید.
+3.  **انتخاب فرمت:**
+    - برای **دانلود ویدیو + صدا:** یک فرمت با پسوند `mp4` یا `webm` انتخاب کنید.
+    - برای **فقط صدا:** فرمت‌های `m4a` یا `mp3` را انتخاب کنید.
+    - برای **فقط ویدیو:** فرمت‌های بدون صدا (مثل `mp4` با گزینه "Best video only") را انتخاب کنید.
+4.  **شروع دانلود:** روی دکمه **"دانلود"** کلیک کنید.
+5.  **نظارت بر پیشرفت:** نوارهای پیشرفت ۳ مرحله‌ای به شما نشان می‌دهند که برنامه در کدام مرحله است.
+
+---
+
+## 📂 ساختار پروژه
+
+```
+youtube_downloader/
+├── assets/                  # فایل‌های گرافیکی و اسکرین‌شات‌ها
+│   ├── screenshot_home.svg
+│   ├── screenshot_quality.svg
+│   └── screenshot_progress.svg
+├── CHANGELOG.md             # تاریخچه تغییرات
+├── CONTRIBUTING.md          # راهنمای مشارکت
+├── LICENSE                  # مجوز MIT
+├── README.md                # این فایل
+├── requirements.txt         # وابستگی‌های پایتون
+├── youtube_downloader.py    # کد اصلی برنامه
+└── take_screenshot.py       # اسکریپت تولید اسکرین‌شات
 ```
 
 ---
 
-## 📖 How to Use
+## 🤝 مشارکت
 
-1. **Copy URL** — Copy YouTube link (watch, youtu.be, shorts, or playlist)
-2. **Paste Link** — Click 📋 button or press Ctrl+V in the input field
-3. **Fetch Info** — Click 🔍 "Get Video Info" button
-4. **Choose Quality** — Select from the dropdown (Video+Audio, Audio-only, etc.)
-5. **Set Path** — Choose download folder (default: `~/Downloads`)
-6. **Start Download** — Click ⬇️ "Start Download"
-7. **Monitor Progress** — Watch 3 progress bars, speed, ETA, and file size
-
-### 🔐 Using Browser Cookies (for restricted videos)
-- Check ✅ "Use Browser Cookies"
-- Select your browser (Chrome is default)
-- **Important:** Be logged into YouTube in that browser before running
+اگر باگ یا پیشنهادی دارید، لطفاً یک [Issue](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/issues) باز کنید.
+ورود به پروژه و توسعه آن برای توسعه‌دهندگان خوش‌آمد است. لطفاً از [CONTRIBUTING.md](CONTRIBUTING.md) پیروی کنید.
 
 ---
 
-## 🏗 Project Structure
+## ⭐ حمایت
 
-```
-youtube-downloader/
-├── youtube_downloader.py    # Main application (GUI + Core Logic)
-├── requirements.txt         # Python dependencies
-├── .gitignore              # Git ignore rules
-├── LICENSE                 # MIT License
-├── README.md               # This file
-└── assets/                 # Images, icons, screenshots
-    ├── icon.ico            # App icon (optional)
-    ├── screenshot_main.png
-    ├── screenshot_quality.png
-    └── screenshot_progress.png
-```
+اگر از این ابزار استفاده می‌کنید، لطفاً یک **⭐ ستاره** به آن بدهید!
+از حمایت شما متشکرم.
 
----
-
-## ⚙️ Advanced Configuration
-
-### Environment Variables (Optional)
-Create a `.env` file in the root:
-```env
-DEFAULT_DOWNLOAD_PATH=D:\Videos\YouTube
-DEFAULT_BROWSER=chrome
-DEFAULT_THEME=dark
-```
-
-### Customization
-- **Theme:** Modify `youtube_downloader.py`:
-  ```python
-  ctk.set_appearance_mode("dark")  # Options: "light", "dark", "system"
-  ctk.set_default_color_theme("blue")  # Options: "blue", "green", "dark-blue"
-  ```
-
----
-
-## 🐛 Troubleshooting
-
-| Issue | Solution |
-|:---|:---|
-| `ffmpeg not found` | Install FFmpeg and add to PATH |
-| `Sign in to confirm` | Enable browser cookies, disable VPN |
-| `ModuleNotFoundError` | Run `pip install -r requirements.txt` |
-| Download stalls | Check internet, try lower quality |
-| Error 403/429 | Refresh cookies, avoid VPN, wait a few minutes |
-| Slow download | Check connection, try stable download speed |
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how you can help:
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/awesome-feature`
-3. Commit your changes: `git commit -m 'Add awesome feature'`
-4. Push to the branch: `git push origin feature/awesome-feature`
-5. Open a Pull Request
-
-**Ideas for contribution:**
-- Playlist & Channel download support
-- Download queue manager
-- Scheduled downloads
-- Format converter
-- Log file export
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
-
----
-
-## 👨‍💻 About the Author
-
-**Mohammad Hasan Kaman**  
-- 🌐 **GitHub:** [@Mohammad-Hasan-Kaman](https://github.com/Mohammad-Hasan-Kaman)  
-- 💼 **LinkedIn:** [Kaman Programmer](https://www.linkedin.com/in/kaman-programmer)  
-- 📧 **Email:** [mohammadhasankaman@gmail.com](mailto:mohammadhasankaman@gmail.com)  
-
-I'm a 17-year-old Full-Stack Developer enthusiast passionate about Python, AI, and building practical tools. This project is part of my journey to become a professional developer.
-
----
-
-## ⭐ Support the Project
-
-If you find this tool useful, please **give it a star**! ⭐  
-Your support motivates me to keep improving and adding new features.
-
-[![Star History](https://api.star-history.com/svg?repos=Mohammad-Hasan-Kaman/youtube-downloader&type=Date)](https://star-history.com/#Mohammad-Hasan-Kaman/youtube-downloader&Date)
+[![Star History](https://api.star-history.com/svg?repos=Mohammad-Hasan-Kaman/youtube-downloader&type=Date)](https://star-history.com/#Mohammad-Hasان-Kaman/youtube-downloader&Date)
 
 ---
 *Maintained by Mohammad Hasan Kaman | Last updated: July 2026*
 
-> **Disclaimer:** This tool is for personal and educational use only. Please respect YouTube's Terms of Service and content creators' copyright.
+> **سلب مسئولیت:** این ابزار صرفاً برای اهداف آموزشی و شخصی است. لطفاً قوانین خدمات YouTube و حقوق کپی رایت سازندگان را رع کنید.
