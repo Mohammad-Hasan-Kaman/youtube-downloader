@@ -130,7 +130,7 @@ Contributions are welcome! Please follow the guidelines in [CONTRIBUTING.md](CON
 If you find this tool useful, please give it a **star**! ⭐  
 Your support motivates further development.
 
-[![Star History](https://api.star-history.com/svg?repos=Mohammad-Hasan-Kaman/youtube-downloader&type=Date)](https://star-history.com/#Mohammad-Hasan-Kaman/youtube-downloader&Date)
+[![Star History](https://api.star-history.com/svg?repos=youtube-downloader&type=Date)](https://star-history.com/#youtube-downloader&Date)
 
 ---
 *Maintained by Mohammad Hasan Kaman | Last updated: July 2026*
