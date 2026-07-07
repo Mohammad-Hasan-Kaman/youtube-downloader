@@ -129,7 +129,7 @@ Contributions are welcome! Please follow the guidelines in [CONTRIBUTING.md](CON
 If you find this tool useful, please give it a **star**! ⭐  
 Your support motivates further development.
 
-[![Star History](https://api.star-history.com/svg?repos=youtube-downloader&type=Date)](https://star-history.com/#youtube-downloader&Date)
+[![Stars](https://img.shields.io/github/stars/Mohammad-Hasan-Kaman/youtube-downloader?style=for-the-badge&logo=github&color=blue)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/stargazers)
 
 ---
 *Maintained by Mohammad Hasan Kaman | Last updated: July 2026*
