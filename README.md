@@ -132,6 +132,6 @@ Your support motivates further development.
 [![Stars](https://img.shields.io/github/stars/Mohammad-Hasan-Kaman/youtube-downloader?style=for-the-badge&logo=github&color=blue)](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/stargazers)
 
 ---
-*Maintained by Mohammad Hasan Kaman | Last updated: July 2026*
+*Maintained by Mohammad Hasan Kaman | Last updated: October 2026*
 
 > **Disclaimer:** This tool is for personal and educational use only. Please respect YouTube's Terms of Service and content creators' copyright.
