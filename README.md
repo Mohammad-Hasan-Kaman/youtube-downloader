@@ -1,6 +1,6 @@
 # 🎬 YouTube Downloader Pro
 
-> An advanced YouTube downloader featuring a modern Persian RTL interface, live progress tracking, and precise quality selection.
+> An advanced YouTube downloader with a Persian-language interface, live progress tracking, and precise format selection.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -17,20 +17,22 @@ This project is designed for **"easy access without technical knowledge"**:
 | **Casual Users** | Download and run the standalone `.exe` file (No Python or dependencies needed). |
 | **Developers** | Clone the source code to study, modify, or extend the functionality. |
 
+> **Platform:** Windows. The app calls `ctypes.windll` to enable per-monitor DPI awareness, so it does not run on Linux or macOS.
+
 ---
 
 ## ✨ Key Features
 
-- 🎨 **Modern Persian RTL UI:** Clean design with Dark Mode enabled by default.
-- 📊 **Live 3-Stage Progress Bar:**
-  1.  **FETCHING:** Retrieving video metadata.
-  2.  **PROCESSING:** Selecting format and preparing download.
-  3.  **DOWNLOADING:** Real-time speed and ETA updates.
+- 🎨 **Persian-language UI with dark mode:** Every label, message and progress stage is in Persian, with Dark Mode enabled by default.
+- 📊 **Three live progress bars:**
+  1.  **Metadata fetch** — an animated indicator that fills while YouTube is queried and the format list is extracted.
+  2.  **Download** — real-time percentage, speed, ETA and transferred/total size.
+  3.  **Overall** — a single bar that tracks the whole operation, with a text stage and a colour that changes with the percentage.
 - 🎯 **Precise Quality & Format Selection:**
-  - **Video + Audio:** 1080p, 720p, 480p, etc.
-  - **Audio Only:** Convert to MP3/MP4 with specific bitrates (128kbps, 192kbps, 256kbps).
-  - **Video Only:** Download video without audio.
-- 🔐 **Browser Cookie Support:** Bypass IP restrictions or download private videos by extracting Chrome/Firefox cookies automatically.
+  - **Video + audio:** 1080p, 720p, 480p, etc. — the last 12 muxed formats, sorted by height.
+  - **Audio only:** the last 4 audio-only streams, sorted by bitrate, each shown with its native container, bitrate and size.
+  - Every option shows the real container, resolution, frame rate and file size that YouTube reports.
+- 🔐 **Browser Cookie Support:** Bypass IP restrictions or reach age/region-restricted videos by extracting cookies from Chrome, Firefox, Edge, Opera or Brave automatically.
 - 📁 **Custom Save Path:** Choose any destination folder for your downloads.
 - 🧵 **Multi-threaded:** Smooth performance with non-blocking UI.
 - 🛡 **Advanced Error Handling:** Clear, user-friendly error messages.
@@ -65,7 +67,7 @@ python youtube_downloader.py
 | Technology | Role |
 |------------|------|
 | **Python 3.10+** | Core programming language |
-| **CustomTkinter** | Modern, cross-platform GUI (RTL support) |
+| **CustomTkinter** | Dark-mode desktop GUI (Windows) |
 | **yt-dlp** | Powerful download engine & metadata extractor |
 | **browser-cookie3** | Secure extraction of browser cookies |
 
@@ -90,9 +92,8 @@ python youtube_downloader.py
 1.  **Paste Link:** Enter the YouTube URL in the input field.
 2.  **Fetch Info:** Click the **"Get Info"** button to retrieve available formats.
 3.  **Select Format:**
-    - **Video + Audio:** Choose a format ending in `.mp4` or `.webm`.
-    - **Audio Only:** Choose `.m4a` or `.mp3`.
-    - **Video Only:** Select available video-only formats.
+    - **Video + audio:** choose one of the muxed formats (`.mp4` or `.webm`).
+    - **Audio only:** choose one of the audio-only streams (`.m4a`, `.webm` or `.opus`).
 4.  **Download:** Click the **"Download"** button to start.
 5.  **Monitor:** Watch the 3-stage progress bar and real-time speed.
 
