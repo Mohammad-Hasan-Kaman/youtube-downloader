@@ -6,6 +6,7 @@ Author: Mohammad-Hasan Kaman
 import sys, os, json, time, threading
 from pathlib import Path
 from PySide6.QtWidgets import (
+    QFrame,
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QPushButton, QComboBox, QGroupBox,
     QProgressBar, QMessageBox, QFileDialog,
@@ -41,13 +42,14 @@ def _save_history(h):
 
 
 class CardWidget(QWidget):
-    """A card container with a title bar."""
+    """A clean card container with title."""
     def __init__(self, title, parent=None):
         super().__init__(parent)
         self.setObjectName("card_widget")
         self._layout = QVBoxLayout(self)
-        self._layout.setContentsMargins(16, 14, 16, 16)
-        self._layout.setSpacing(12)
+        self._layout.setContentsMargins(20, 18, 20, 18)
+        self._layout.setSpacing(14)
+
         title_bar = QWidget()
         title_bar.setObjectName("card_title_bar")
         title_h = QHBoxLayout(title_bar)
@@ -57,6 +59,13 @@ class CardWidget(QWidget):
         title_h.addWidget(title_lbl)
         title_h.addStretch()
         self._layout.addWidget(title_bar)
+        # Separator line
+        sep = QFrame()
+        sep.setObjectName("card_separator")
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Plain)
+        sep.setFixedHeight(1)
+        self._layout.addWidget(sep)
 
     def add_widget(self, w):
         self._layout.addWidget(w)
@@ -79,8 +88,8 @@ class StyledButton(QPushButton):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("TubeX")
-        self.setMinimumSize(800, 560)
+        self.setWindowTitle("TubeX - YouTube Downloader")
+        self.setMinimumSize(900, 620)
         self._tunnel = TunnelManager(self)
         self._worker = DownloadWorker(self._tunnel)
         self._history = _load_history()
@@ -99,52 +108,75 @@ class MainWindow(QMainWindow):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
+        # ─── Top Bar ───
         topbar = QWidget()
         topbar.setObjectName("topbar")
         topbar_h = QHBoxLayout(topbar)
-        topbar_h.setContentsMargins(20, 10, 20, 10)
+        topbar_h.setContentsMargins(24, 14, 24, 14)
         topbar_h.setSpacing(16)
+
         title_lbl = QLabel("TubeX")
         title_lbl.setObjectName("app_title")
         topbar_h.addWidget(title_lbl)
         topbar_h.addStretch()
-        self._status_lbl = QLabel("\u062f\u0631 \u0647\u0627\u0644 \u0628\u0631\u0631\u0633\u06cc...")
+
+        self._status_lbl = QLabel("در حال بررسی اتصال...")
         self._status_lbl.setObjectName("status_badge")
         topbar_h.addWidget(self._status_lbl)
+
         root.addWidget(topbar)
 
+        # ─── Content Area ───
         content = QWidget()
+        content.setObjectName("content_area")
         content_layout = QVBoxLayout(content)
-        content_layout.setContentsMargins(20, 20, 20, 20)
-        content_layout.setSpacing(14)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(20)
 
-        self._input_card = CardWidget("\u0644\u06cc\u0646\u06a9 \u0648\u06cc\u062f\u06cc\u0648")
+        # URL Input Card
+        self._input_card = CardWidget("لینک ویدیو")
         self._url_edit = QLineEdit()
-        self._url_edit.setPlaceholderText("\u0627\u0631\u062f\u0633 \u0648\u06cc\u062f\u06cc\u0648\u06cc \u0648\u06cc\u0648\u062a\u06cc\u0628 \u0631\u0627 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f")
-        self._url_edit.setMinimumHeight(48)
+        self._url_edit.setPlaceholderText("آدرس ویدیوی یوتیوب را اینجا وارد کنید")
+        self._url_edit.setMinimumHeight(52)
+        self._url_edit.setObjectName("url_input")
         self._url_edit.returnPressed.connect(self._fetch_info)
         self._input_card.add_widget(self._url_edit)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(10)
-        self._btn_fetch = StyledButton("\u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a", accent=True)
+        btn_row.setSpacing(12)
+        self._btn_fetch = StyledButton("دریافت اطلاعات", accent=True)
+        self._btn_fetch.setMinimumWidth(160)
         self._btn_fetch.clicked.connect(self._fetch_info)
-        btn_row.addWidget(self._btn_fetch, 1)
-        self._btn_dir = StyledButton("\u062a\u063a\u06cc\u06cc\u0631 \u067e\u0648\u0634\u0647")
+        btn_row.addWidget(self._btn_fetch)
+
+        self._btn_dir = StyledButton("تغییر پوشه")
+        self._btn_dir.setMinimumWidth(130)
         self._btn_dir.clicked.connect(self._change_dir)
         btn_row.addWidget(self._btn_dir)
+
         self._dir_label = QLabel(str(self._setting_save_dir))
         self._dir_label.setObjectName("dir_label")
         self._dir_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self._dir_label.setWordWrap(True)
+        self._dir_label.setMinimumWidth(300)
         btn_row.addWidget(self._dir_label, 1)
-        self._input_card.add_layout(btn_row)
-        content_layout.add_widget(self._input_card)
 
-        self._fmt_card = CardWidget("\u0641\u0631\u0645\u062a \u062f\u0627\u0646\u0644\u0648\u062f")
+        self._input_card.add_layout(btn_row)
+        content_layout.addWidget(self._input_card)
+
+        # Format Selection Card
+        self._fmt_card = CardWidget("فرمت دانلود")
+
+        # Tabs
         tab_h = QHBoxLayout()
-        tab_h.setSpacing(4)
-        self._tab_video = StyledButton("\u0648\u06cc\u062f\u06cc\u0648")
-        self._tab_audio = StyledButton("\u0635\u062f\u0627")
+        tab_h.setSpacing(8)
+        self._tab_video = StyledButton("ویدیو", accent=True)
+        self._tab_audio = StyledButton("صدا")
+        self._tab_video.setMinimumWidth(110)
+        self._tab_audio.setMinimumWidth(110)
+        self._tab_video.setCheckable(True)
+        self._tab_audio.setCheckable(True)
+        self._tab_video.setChecked(True)
         self._tab_video.clicked.connect(lambda: self._switch_tab("video"))
         self._tab_audio.clicked.connect(lambda: self._switch_tab("audio"))
         tab_h.addWidget(self._tab_video)
@@ -152,81 +184,106 @@ class MainWindow(QMainWindow):
         tab_h.addStretch()
         self._fmt_card.add_layout(tab_h)
 
-        self._video_grp = QGroupBox("\u0627\u0646\u062a\u062e\u0627\u0628 \u06a9\u06cc\u0641\u06cc\u062a")
+        # Video formats group
+        self._video_grp = QGroupBox("انتخاب کیفیت ویدیو")
+        self._video_grp.setObjectName("format_group")
         self._video_v = QVBoxLayout(self._video_grp)
-        self._video_v.setSpacing(4)
-        self._video_formats_lbl = QLabel("\u0627\u0628\u062a\u062f\u0627 \u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a \u0631\u0627 \u0628\u0632\u0646\u06cc\u062f.")
+        self._video_v.setSpacing(8)
+        self._video_v.setContentsMargins(12, 16, 12, 12)
+        self._video_formats_lbl = QLabel("ابتدا «دریافت اطلاعات» را بزنید تا کیفیت‌های موجود نمایش داده شود.")
         self._video_formats_lbl.setWordWrap(True)
         self._video_formats_lbl.setObjectName("format_info")
         self._video_v.addWidget(self._video_formats_lbl)
         self._fmt_card.add_widget(self._video_grp)
 
-        self._audio_grp = QGroupBox("\u0627\u0646\u062a\u062e\u0627\u0628 \u06a9\u06cc\u0641\u06cc\u062a \u0635\u062f\u0627")
+        # Audio formats group
+        self._audio_grp = QGroupBox("انتخاب کیفیت صدا")
+        self._audio_grp.setObjectName("format_group")
         self._audio_v = QVBoxLayout(self._audio_grp)
-        self._audio_v.setSpacing(4)
-        self._audio_formats_lbl = QLabel("\u0627\u0628\u062a\u062f\u0627 \u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a \u0631\u0627 \u0628\u0632\u0646\u06cc\u062f.")
+        self._audio_v.setSpacing(8)
+        self._audio_v.setContentsMargins(12, 16, 12, 12)
+        self._audio_formats_lbl = QLabel("ابتدا «دریافت اطلاعات» را بزنید تا کیفیت‌های موجود نمایش داده شود.")
         self._audio_formats_lbl.setWordWrap(True)
         self._audio_formats_lbl.setObjectName("format_info")
         self._audio_v.addWidget(self._audio_formats_lbl)
         self._audio_grp.setVisible(False)
         self._fmt_card.add_widget(self._audio_grp)
 
+        # Options row
         opts_h = QHBoxLayout()
-        opts_h.setSpacing(16)
-        opts_h.addWidget(QLabel("\u0632\u06cc\u0631\u0646\u0648\u06cc\u0633:"))
+        opts_h.setSpacing(20)
+        opts_h.addWidget(QLabel("زیرنویس:"))
         self._sub_combo = QComboBox()
-        self._sub_combo.addItems(["\u0628\u062f\u0648\u0646", "fa", "en", "zh-Hans", "ar"])
+        self._sub_combo.addItems(["بدون", "fa", "en", "zh-Hans", "ar"])
+        self._sub_combo.setMinimumWidth(140)
+        self._sub_combo.setObjectName("sub_combo")
         opts_h.addWidget(self._sub_combo)
         opts_h.addStretch()
-        self._thumb_chk = QCheckBox("\u062f\u0627\u0646\u0644\u0648\u062f \u062a\u0635\u0648\u06cc\u0631 \u0648\u06cc\u062f\u06cc\u0648")
+        self._thumb_chk = QCheckBox("دانلود تصویر ویدیو (Thumbnail)")
         opts_h.addWidget(self._thumb_chk)
         self._fmt_card.add_layout(opts_h)
-        content_layout.add_widget(self._fmt_card)
 
+        content_layout.addWidget(self._fmt_card)
+
+        # Action Buttons
         act_h = QHBoxLayout()
-        act_h.setSpacing(12)
-        self._btn_download = StyledButton("\u0634\u0631\u0648\u0639 \u062f\u0627\u0646\u0644\u0648\u062f", accent=True)
+        act_h.setSpacing(16)
+        self._btn_download = StyledButton("شروع دانلود", accent=True)
+        self._btn_download.setMinimumWidth(180)
+        self._btn_download.setMinimumHeight(48)
         self._btn_download.setEnabled(False)
         self._btn_download.clicked.connect(self._on_download)
         act_h.addWidget(self._btn_download)
-        self._btn_cancel = StyledButton("\u0644\u063a\u0648", danger=True)
+
+        self._btn_cancel = StyledButton("لغو", danger=True)
+        self._btn_cancel.setMinimumWidth(130)
+        self._btn_cancel.setMinimumHeight(48)
         self._btn_cancel.setEnabled(False)
         self._btn_cancel.clicked.connect(self._cancel_download)
         act_h.addWidget(self._btn_cancel)
         act_h.addStretch()
-        content_layout.add_layout(act_h)
+        content_layout.addLayout(act_h)
 
-        self._prog_card = CardWidget("\u0648\u0636\u0639\u06cc\u062a \u062f\u0627\u0646\u0644\u0648\u062f")
+        # Progress Card
+        self._prog_card = CardWidget("وضعیت دانلود")
         self._progress_lbl = QLabel("")
         self._progress_lbl.setObjectName("progress_text")
         self._progress_bar = QProgressBar()
         self._progress_bar.setValue(0)
         self._progress_bar.setObjectName("main_progress")
+        self._progress_bar.setMinimumHeight(16)
         self._prog_card.add_widget(self._progress_lbl)
         self._prog_card.add_widget(self._progress_bar)
-        content_layout.add_widget(self._prog_card)
+        content_layout.addWidget(self._prog_card)
 
+        # Log + History Splitter
         splitter = QSplitter(Qt.Vertical)
-        splitter.setHandleWidth(4)
+        splitter.setHandleWidth(6)
+        splitter.setChildrenCollapsible(False)
 
-        self._log_card = CardWidget("\u0641\u0639\u0627\u0644\u06cc\u062a‌‌ه\u0627")
+        self._log_card = CardWidget("فعالیت‌ها")
         self._log_edit = QTextEdit()
         self._log_edit.setReadOnly(True)
-        self._log_edit.setMaximumHeight(90)
+        self._log_edit.setMaximumHeight(120)
         self._log_edit.setObjectName("log_area")
         self._log_card.add_widget(self._log_edit)
         splitter.addWidget(self._log_card)
 
-        self._hist_card = CardWidget("\u062a\u0627\u0631\u06cc\u062e\u0686\u0647 \u062f\u0627\u0646\u0644\u0648\u062f\u0647\u0627")
+        self._hist_card = CardWidget("تاریخچه دانلودها")
         self._history_list = QListWidget()
         self._history_list.itemDoubleClicked.connect(self._on_history_click)
+        self._history_list.setObjectName("history_list")
         self._hist_card.add_widget(self._history_list)
         splitter.addWidget(self._hist_card)
 
-        content_layout.add_widget(splitter)
+        splitter.setSizes([120, 200])
+        content_layout.addWidget(splitter)
         content_layout.setStretchFactor(splitter, 1)
+
         root.addWidget(content)
-        self.statusBar().showMessage("\u0622\u0645\u0627\u062f\u0647")
+
+        # Status bar
+        self.statusBar().showMessage("آماده")
         self.statusBar().setObjectName("statusbar")
 
     def _apply_stylesheet(self):
@@ -249,30 +306,36 @@ class MainWindow(QMainWindow):
 
     def _update_status(self, code):
         labels = {
-            0: "\u0642\u0637\u0639\u06cc \u0627\u062a\u0635\u0627\u0644",
-            1: "\u0628\u0631\u0631\u0633\u06cc \u0627\u062a\u0635\u0627\u0644...",
-            2: "\u0645\u0633\u062a\u0642\u06cc\u0645",
-            3: "\u062a\u0648\u0646\u0644 \u0641\u0639\u0627\u0644",
-            4: "\u062e\u0637\u0627 \u0627\u062a\u0635\u0627\u0644",
+            0: "قطع اتصال",
+            1: "بررسی اتصال...",
+            2: "اتصال مستقیم",
+            3: "تونل فعال",
+            4: "خطای اتصال",
         }
-        colors = {0: "#7f1d1d", 1: "#854d0e", 2: "#14532d", 3: "#1e3a5f", 4: "#7f1d1d"}
-        self._status_lbl.setText(labels.get(code, "\u0646\u0627\u0645\u0634\u062e\u0648\u0636"))
+        colors = {
+            0: "#7f1d1d",
+            1: "#854d0e",
+            2: "#14532d",
+            3: "#1e3a5f",
+            4: "#7f1d1d",
+        }
+        self._status_lbl.setText(labels.get(code, "نامشخص"))
         self._status_lbl.setStyleSheet(
             "background-color: %s; border: 1px solid %s; color: #e2e8f0; "
-            "border-radius: 20px; padding: 4px 14px; font-size: 11px;"
+            "border-radius: 20px; padding: 5px 16px; font-size: 11px;"
             % (colors.get(code, "#1e293b"), colors.get(code, "#334155"))
         )
 
     def _fetch_info(self):
         url = parse_url(self._url_edit.text())
         if not url:
-            self._show_error("\u0644\u0637\u0641\u0627 \u0627\u0631\u062f\u0633 \u0645\u0639\u062a\u0628\u0631 \u0648\u0627\u0631\u062f \u06a9\u0646\u06cc\u062f.")
+            self._show_error("لطفاً آدرس معتبر وارد کنید.")
             return
         self._btn_download.setEnabled(False)
         self._btn_cancel.setEnabled(False)
-        self._video_formats_lbl.setText("\u062f\u0631 \u0647\u0627\u0644 \u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a...")
-        self._audio_formats_lbl.setText("\u062f\u0631 \u0647\u0627\u0644 \u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a...")
-        self._log_edit.append("\u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a: " + url)
+        self._video_formats_lbl.setText("در حال دریافت اطلاعات...")
+        self._audio_formats_lbl.setText("در حال دریافت اطلاعات...")
+        self._log_edit.append(f"دریافت اطلاعات: {url}")
         self._info_thread = threading.Thread(target=self._fetch_info_bg, args=(url,), daemon=True)
         self._info_thread.start()
 
@@ -297,9 +360,9 @@ class MainWindow(QMainWindow):
                 ]
                 self._display_formats()
                 self._btn_download.setEnabled(True)
-                self._log_edit.append("\u0627\u067e\u0644\u06cc\u06a9\u0627\u062a \u062f\u0631\u06cc\u0627\u0641\u062a \u0634\u062f: " + str(info.get("title", "?")))
+                self._log_edit.append(f"اطلاعات دریافت شد: {info.get('title', '?')}")
         except Exception as e:
-            self._show_error("\u062e\u0637\u0627 \u062f\u0631 \u062f\u0631\u06cc\u0627\u0641\u062a \u0627\u067e\u0644\u06cc\u06a9\u0627\u062a: " + str(e))
+            self._show_error(f"خطا در دریافت اطلاعات: {e}")
 
     def _display_formats(self):
         vids = sorted(
@@ -330,26 +393,36 @@ class MainWindow(QMainWindow):
         self._video_grp.setVisible(tab == "video")
         self._audio_grp.setVisible(tab == "audio")
         if tab == "video":
+            self._tab_video.setChecked(True)
+            self._tab_audio.setChecked(False)
             self._tab_video.setObjectName("tab_active")
             self._tab_audio.setObjectName("")
         else:
+            self._tab_audio.setChecked(True)
+            self._tab_video.setChecked(False)
             self._tab_audio.setObjectName("tab_active")
             self._tab_video.setObjectName("")
+        self._tab_video.style().unpolish(self._tab_video)
+        self._tab_video.style().polish(self._tab_video)
+        self._tab_audio.style().unpolish(self._tab_audio)
+        self._tab_audio.style().polish(self._tab_audio)
 
     def _on_download(self):
         url = parse_url(self._url_edit.text())
         if not url:
-            self._show_error("\u0627\u0631\u062f\u0633 \u0648\u06cc\u062f\u06cc\u0648 \u0644\u0627\u0632\u0645 \u0627\u0633\u062a.")
+            self._show_error("آدرس ویدیو لازم است.")
             return
         fmt = "+" if self._video_grp.isVisible() else "bestaudio[ext=m4a]/bestaudio/best"
-        sub_lang = "" if self._sub_combo.currentText() == "\u0628\u062f\u0648\u0646" else self._sub_combo.currentText()
+        sub_lang = "" if self._sub_combo.currentText() == "بدون" else self._sub_combo.currentText()
         thumb = self._thumb_chk.isChecked()
         out_dir = self._setting_save_dir
+
         self._btn_download.setEnabled(False)
         self._btn_cancel.setEnabled(True)
         self._progress_bar.setValue(0)
-        self._progress_lbl.setText("\u0634\u0631\u0648\u0639 \u062f\u0627\u0646\u0644\u0648\u062f...")
-        self._log_edit.append("\u0634\u0631\u0648\u0639 \u062f\u0627\u0646\u0644\u0648\u062f: " + url)
+        self._progress_lbl.setText("شروع دانلود...")
+        self._log_edit.append(f"شروع دانلود: {url}")
+
         self._dl_thread = threading.Thread(
             target=self._download_bg,
             args=(url, fmt, out_dir, sub_lang, thumb),
@@ -393,10 +466,10 @@ class MainWindow(QMainWindow):
             speed = d.get("speed", 0) or 0
             self.progress_update.emit(pct, "%.1f KB/s" % speed, downloaded)
         elif d["status"] == "finished":
-            self.status_msg.emit("\u062f\u0627\u0646\u0644\u0648\u062f \u062a\u06a9\u0645\u06cc\u0644 \u0634\u062f")
+            self.status_msg.emit("دانلود تکمیل شد")
 
     def _cancel_download(self):
-        self._log_edit.append("\u0644\u063a\u0648 \u062f\u0627\u0646\u0644\u0648\u062f...")
+        self._log_edit.append("لغو دانلود...")
         self._btn_download.setEnabled(True)
         self._btn_cancel.setEnabled(False)
 
@@ -409,11 +482,11 @@ class MainWindow(QMainWindow):
         self._btn_cancel.setEnabled(False)
         if ok:
             self._progress_bar.setValue(100)
-            self._progress_lbl.setText("\u062f\u0627\u0646\u0644\u0648\u062f \u062a\u06a9\u0645\u06cc\u0644 \u0634\u062f")
+            self._progress_lbl.setText("دانلود تکمیل شد")
             self._save_to_history(info)
             self._populate_history()
         else:
-            self._progress_lbl.setText("\u0644\u063a\u0648 \u0634\u062f.")
+            self._progress_lbl.setText("لغو شد.")
 
     def _save_to_history(self, info):
         entry = {
@@ -441,7 +514,7 @@ class MainWindow(QMainWindow):
             self._fetch_info()
 
     def _change_dir(self):
-        d = QFileDialog.getExistingDirectory(self, "\u0627\u0646\u062a\u062e\u0627\u0628 \u067e\u0648\u0634\u0647 \u062f\u0627\u0646\u0644\u0648\u062f")
+        d = QFileDialog.getExistingDirectory(self, "انتخاب پوشه دانلود")
         if d:
             self._setting_save_dir = Path(d)
             self._dir_label.setText(str(self._setting_save_dir))
@@ -451,8 +524,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(msg[:60])
 
     def _show_error(self, msg):
-        self._log_edit.append("\u062e\u0637\u0627: " + msg)
-        QMessageBox.warning(self, "\u062e\u0637\u0627", msg)
+        self._log_edit.append("خطا: " + msg)
+        QMessageBox.warning(self, "خطا", msg)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
