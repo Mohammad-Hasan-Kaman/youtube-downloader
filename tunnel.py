@@ -72,21 +72,16 @@ class TunnelManager(QObject):
         except Exception: return False
 
     def ensure_tunnel(self):
-        self.log_signal.emit("بررسی وضعیت اتصال...")
+        """Always start Aether tunnel (zero user action needed)."""
+        self.log_signal.emit("راه‌اندازی تونل Aether...")
         self.status_changed.emit(1)
         aether_bin = self._ensure_aether()
         self._ensure_ytdlp()
         self._ensure_ffmpeg()
         if not aether_bin:
-            self.log_signal.emit("خطا: دانلود Aether ناموفق بود.")
+            self.log_signal.emit("خطا: دانلود Aether ناموفق بود. فقط دانلود مستقیم.")
             self.status_changed.emit(4)
             return False
-        if self.test_direct():
-            self.log_signal.emit("اتصال مستقیم برقرار است.")
-            self.status_changed.emit(2)
-            self._proxy_used=False
-            return True
-        self.log_signal.emit("YouTube مسدود است. شروع تونل...")
         return self.start_tunnel(aether_bin)
 
     def _ensure_aether(self):
@@ -146,14 +141,15 @@ class TunnelManager(QObject):
     def start_tunnel(self, aether_bin):
         if self._proc is not None: return True
         try:
-            self._proc = asyncio.subprocess.create_subprocess_exec(
-                str(aether_bin), "--masque","-4",
-                "--scan","balanced","--noize","firewall",
-                f"--bind","127.0.0.1:{self._port}",
-                "--quick-reconnect",
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+            import subprocess
+            self._proc = subprocess.Popen(
+                [str(aether_bin), "--masque","-4",
+                 "--scan","balanced","--noize","firewall",
+                 f"--bind","127.0.0.1:{self._port}",
+                 "--quick-reconnect"],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 cwd=str(AETHER_DIR))
             self._wait_proxy()
         except Exception as e:

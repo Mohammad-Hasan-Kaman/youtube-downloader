@@ -132,9 +132,7 @@ class MainWindow(QMainWindow):
         layout.addSpacing(4)
 
         # Input card
-        self._input_card = self._make_card("آدرس ویدیو")
-        inp_layout = QVBoxLayout(self._input_card)
-        inp_layout.setSpacing(8)
+        self._input_card, inp_layout = self._make_card("آدرس ویدیو")
 
         self._url_edit = QLineEdit()
         self._url_edit.setPlaceholderText("https://www.youtube.com/watch?v=... یا کد ویدیو را وارد کنید")
@@ -145,7 +143,7 @@ class MainWindow(QMainWindow):
         row2.setSpacing(8)
         btn_fetch = QPushButton("دریافت اطلاعات")
         btn_fetch.setObjectName("btn_fetch")
-        btn_fetch.clicked.connect(self._on_fetch_info)
+        btn_fetch.clicked.connect(self._fetch_info)
         row2.addWidget(btn_fetch)
 
         btn_dir = QPushButton("📁 تغییر پوشه")
@@ -161,9 +159,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(self._input_card)
 
         # Format selection card
-        self._fmt_card = self._make_card("فرمت دانلود")
-        fmt_layout = QVBoxLayout(self._fmt_card)
-        fmt_layout.setSpacing(8)
+        self._fmt_card, fmt_layout = self._make_card("فرمت دانلود")
 
         # Tabs for video / audio
         tab_row = QHBoxLayout()
@@ -232,9 +228,7 @@ class MainWindow(QMainWindow):
         layout.addLayout(btn_row)
 
         # Progress section
-        prog_card = self._make_card("وضعیت دانلود")
-        prog_layout = QVBoxLayout(prog_card)
-        prog_layout.setSpacing(6)
+        prog_card, prog_layout = self._make_card("وضعیت دانلود")
 
         self._progress_lbl = QLabel("")
         self._progress_lbl.setStyleSheet("color:#a0b4d0; font-size:12px;")
@@ -251,8 +245,8 @@ class MainWindow(QMainWindow):
         splitter.setHandleWidth(6)
 
         # Log
-        log_card = self._make_card("لاگ")
-        log_layout = QVBoxLayout(log_card)
+        # Log
+        log_card, log_layout = self._make_card("لاگ")
         self._log_edit = QTextEdit()
         self._log_edit.setReadOnly(True)
         self._log_edit.setMaximumHeight(120)
@@ -260,8 +254,8 @@ class MainWindow(QMainWindow):
         splitter.addWidget(log_card)
 
         # History
-        hist_card = self._make_card("تاریخچه دانلودها")
-        hist_layout = QVBoxLayout(hist_card)
+        # History
+        hist_card, hist_layout = self._make_card("تاریخچه دانلودها")
         self._history_list = QListWidget()
         self._history_list.itemDoubleClicked.connect(self._on_history_click)
         hist_layout.addWidget(self._history_list)
@@ -271,6 +265,7 @@ class MainWindow(QMainWindow):
         layout.setStretchFactor(splitter, 1)
 
     def _make_card(self, title):
+        """Create a card widget with a title bar and return (card, layout)."""
         card = QWidget()
         card.setObjectName("card")
         card.setStyleSheet("""
@@ -278,10 +273,11 @@ class MainWindow(QMainWindow):
         """)
         layout = QVBoxLayout(card)
         layout.setContentsMargins(12, 8, 12, 12)
+        layout.setSpacing(8)
         tl = QLabel(title)
         tl.setStyleSheet("color: #a0b4d0; font-size: 13px; font-weight: bold; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #1e2a45;")
         layout.addWidget(tl)
-        return card
+        return card, layout
 
     # ─── Styles ────────────────────────────────────────────────────────────
     def _apply_stylesheet(self):
@@ -327,6 +323,19 @@ class MainWindow(QMainWindow):
         """)
 
     # ─── Fetch Info ────────────────────────────────────────────────────────
+    def _fetch_info(self):
+        url = parse_url(self._url_edit.text())
+        if not url:
+            self._show_error("لطفاً آدرس معتبر وارد کنید.")
+            return
+        self._btn_download.setEnabled(False)
+        self._btn_cancel.setEnabled(False)
+        self._video_formats_lbl.setText("در حال دریافت اطلاعات...")
+        self._audio_formats_lbl.setText("در حال دریافت اطلاعات...")
+        self._log_edit.append(f"دریافت اطلاعات: {url}")
+        self._info_thread = threading.Thread(target=self._fetch_info_bg, args=(url,), daemon=True)
+        self._info_thread.start()
+
     def _fetch_info_bg(self, url):
         opts = {
             "quiet": True,
@@ -462,7 +471,7 @@ class MainWindow(QMainWindow):
         url = item.data(Qt.ItemDataRole.UserRole)
         if url:
             self._url_edit.setText(url)
-            self._on_fetch_info()
+            self._fetch_info()
 
     # ─── Misc ──────────────────────────────────────────────────────────────
     def _change_dir(self):
@@ -490,7 +499,7 @@ class MainWindow(QMainWindow):
             if self._btn_download.isEnabled():
                 self._on_download()
             else:
-                self._on_fetch_info()
+                self._fetch_info()
         super().keyPressEvent(event)
 
 
