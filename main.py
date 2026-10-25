@@ -42,7 +42,6 @@ def _save_history(h):
 
 
 class CardWidget(QWidget):
-    """A clean card container with title."""
     def __init__(self, title, parent=None):
         super().__init__(parent)
         self.setObjectName("card_widget")
@@ -59,7 +58,7 @@ class CardWidget(QWidget):
         title_h.addWidget(title_lbl)
         title_h.addStretch()
         self._layout.addWidget(title_bar)
-        # Separator line
+
         sep = QFrame()
         sep.setObjectName("card_separator")
         sep.setFrameShape(QFrame.Shape.HLine)
@@ -89,7 +88,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("TubeX - YouTube Downloader")
-        self.setMinimumSize(900, 620)
+        self.setMinimumSize(900, 650)
+        self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        
         self._tunnel = TunnelManager(self)
         self._worker = DownloadWorker(self._tunnel)
         self._history = _load_history()
@@ -103,14 +104,16 @@ class MainWindow(QMainWindow):
 
     def _setup_ui(self):
         central = QWidget()
+        central.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         self.setCentralWidget(central)
         root = QVBoxLayout(central)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # ─── Top Bar ───
+        # Top Bar
         topbar = QWidget()
         topbar.setObjectName("topbar")
+        topbar.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         topbar_h = QHBoxLayout(topbar)
         topbar_h.setContentsMargins(24, 14, 24, 14)
         topbar_h.setSpacing(16)
@@ -126,9 +129,10 @@ class MainWindow(QMainWindow):
 
         root.addWidget(topbar)
 
-        # ─── Content Area ───
+        # Content Area
         content = QWidget()
         content.setObjectName("content_area")
+        content.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         content_layout = QVBoxLayout(content)
         content_layout.setContentsMargins(24, 24, 24, 24)
         content_layout.setSpacing(20)
@@ -159,6 +163,7 @@ class MainWindow(QMainWindow):
         self._dir_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self._dir_label.setWordWrap(True)
         self._dir_label.setMinimumWidth(300)
+        self._dir_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         btn_row.addWidget(self._dir_label, 1)
 
         self._input_card.add_layout(btn_row)
@@ -190,10 +195,12 @@ class MainWindow(QMainWindow):
         self._video_v = QVBoxLayout(self._video_grp)
         self._video_v.setSpacing(8)
         self._video_v.setContentsMargins(12, 16, 12, 12)
-        self._video_formats_lbl = QLabel("ابتدا «دریافت اطلاعات» را بزنید تا کیفیت‌های موجود نمایش داده شود.")
-        self._video_formats_lbl.setWordWrap(True)
-        self._video_formats_lbl.setObjectName("format_info")
-        self._video_v.addWidget(self._video_formats_lbl)
+        
+        self._quality_combo = QComboBox()
+        self._quality_combo.setObjectName("quality_combo")
+        self._quality_combo.addItem("ابتدا دریافت اطلاعات را بزنید")
+        self._quality_combo.setEnabled(False)
+        self._video_v.addWidget(self._quality_combo)
         self._fmt_card.add_widget(self._video_grp)
 
         # Audio formats group
@@ -202,24 +209,30 @@ class MainWindow(QMainWindow):
         self._audio_v = QVBoxLayout(self._audio_grp)
         self._audio_v.setSpacing(8)
         self._audio_v.setContentsMargins(12, 16, 12, 12)
-        self._audio_formats_lbl = QLabel("ابتدا «دریافت اطلاعات» را بزنید تا کیفیت‌های موجود نمایش داده شود.")
-        self._audio_formats_lbl.setWordWrap(True)
-        self._audio_formats_lbl.setObjectName("format_info")
-        self._audio_v.addWidget(self._audio_formats_lbl)
+        
+        self._audio_combo = QComboBox()
+        self._audio_combo.setObjectName("quality_combo")
+        self._audio_combo.addItem("ابتدا دریافت اطلاعات را بزنید")
+        self._audio_combo.setEnabled(False)
+        self._audio_v.addWidget(self._audio_combo)
         self._audio_grp.setVisible(False)
         self._fmt_card.add_widget(self._audio_grp)
 
         # Options row
         opts_h = QHBoxLayout()
         opts_h.setSpacing(20)
-        opts_h.addWidget(QLabel("زیرنویس:"))
+        lbl_sub = QLabel("زیرنویس:")
+        lbl_sub.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        opts_h.addWidget(lbl_sub)
         self._sub_combo = QComboBox()
         self._sub_combo.addItems(["بدون", "fa", "en", "zh-Hans", "ar"])
         self._sub_combo.setMinimumWidth(140)
         self._sub_combo.setObjectName("sub_combo")
         opts_h.addWidget(self._sub_combo)
         opts_h.addStretch()
+        
         self._thumb_chk = QCheckBox("دانلود تصویر ویدیو (Thumbnail)")
+        self._thumb_chk.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
         opts_h.addWidget(self._thumb_chk)
         self._fmt_card.add_layout(opts_h)
 
@@ -228,26 +241,27 @@ class MainWindow(QMainWindow):
         # Action Buttons
         act_h = QHBoxLayout()
         act_h.setSpacing(16)
-        self._btn_download = StyledButton("شروع دانلود", accent=True)
-        self._btn_download.setMinimumWidth(180)
-        self._btn_download.setMinimumHeight(48)
-        self._btn_download.setEnabled(False)
-        self._btn_download.clicked.connect(self._on_download)
-        act_h.addWidget(self._btn_download)
-
+        act_h.addStretch()
         self._btn_cancel = StyledButton("لغو", danger=True)
         self._btn_cancel.setMinimumWidth(130)
         self._btn_cancel.setMinimumHeight(48)
         self._btn_cancel.setEnabled(False)
         self._btn_cancel.clicked.connect(self._cancel_download)
         act_h.addWidget(self._btn_cancel)
-        act_h.addStretch()
+        
+        self._btn_download = StyledButton("شروع دانلود", accent=True)
+        self._btn_download.setMinimumWidth(180)
+        self._btn_download.setMinimumHeight(48)
+        self._btn_download.setEnabled(False)
+        self._btn_download.clicked.connect(self._on_download)
+        act_h.addWidget(self._btn_download)
         content_layout.addLayout(act_h)
 
         # Progress Card
         self._prog_card = CardWidget("وضعیت دانلود")
         self._progress_lbl = QLabel("")
         self._progress_lbl.setObjectName("progress_text")
+        self._progress_lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self._progress_bar = QProgressBar()
         self._progress_bar.setValue(0)
         self._progress_bar.setObjectName("main_progress")
@@ -257,7 +271,7 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(self._prog_card)
 
         # Log + History Splitter
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         splitter.setHandleWidth(6)
         splitter.setChildrenCollapsible(False)
 
@@ -276,7 +290,7 @@ class MainWindow(QMainWindow):
         self._hist_card.add_widget(self._history_list)
         splitter.addWidget(self._hist_card)
 
-        splitter.setSizes([120, 200])
+        splitter.setSizes([120, 220])
         content_layout.addWidget(splitter)
         content_layout.setStretchFactor(splitter, 1)
 
@@ -333,8 +347,12 @@ class MainWindow(QMainWindow):
             return
         self._btn_download.setEnabled(False)
         self._btn_cancel.setEnabled(False)
-        self._video_formats_lbl.setText("در حال دریافت اطلاعات...")
-        self._audio_formats_lbl.setText("در حال دریافت اطلاعات...")
+        self._quality_combo.clear()
+        self._quality_combo.addItem("در حال دریافت اطلاعات...")
+        self._quality_combo.setEnabled(False)
+        self._audio_combo.clear()
+        self._audio_combo.addItem("در حال دریافت اطلاعات...")
+        self._audio_combo.setEnabled(False)
         self._log_edit.append(f"دریافت اطلاعات: {url}")
         self._info_thread = threading.Thread(target=self._fetch_info_bg, args=(url,), daemon=True)
         self._info_thread.start()
@@ -371,23 +389,27 @@ class MainWindow(QMainWindow):
              and f.get("height") is not None],
             key=lambda x: x.get("height") or 0, reverse=True
         )[:12]
-        lines = []
+        self._quality_combo.clear()
         for f in vids:
-            lines.append("  %s | %s | %sp | %s" % (
+            text = "{} | {} | {}p | {}".format(
                 f.get("format_id", "?"), f.get("ext", "?"),
-                f.get("height", "?"), fmt_size(f.get("filesize", 0))))
-        self._video_formats_lbl.setText("\n".join(lines))
+                f.get("height", "?"), fmt_size(f.get("filesize", 0)))
+            self._quality_combo.addItem(text)
+        self._quality_combo.setEnabled(True)
+        self._quality_combo.setCurrentIndex(0)
 
         auds = sorted(
             self._audio_formats,
             key=lambda x: int(x.get("abr") or 0), reverse=True
         )[:4]
-        lines = []
+        self._audio_combo.clear()
         for f in auds:
-            lines.append("  %s | %s | %skbps | %s" % (
+            text = "{} | {} | {}kbps | {}".format(
                 f.get("format_id", "?"), f.get("ext", "?"),
-                f.get("abr", "?"), fmt_size(f.get("filesize", 0))))
-        self._audio_formats_lbl.setText("\n".join(lines))
+                f.get("abr", "?"), fmt_size(f.get("filesize", 0)))
+            self._audio_combo.addItem(text)
+        self._audio_combo.setEnabled(True)
+        self._audio_combo.setCurrentIndex(0)
 
     def _switch_tab(self, tab):
         self._video_grp.setVisible(tab == "video")
@@ -421,7 +443,7 @@ class MainWindow(QMainWindow):
         self._btn_cancel.setEnabled(True)
         self._progress_bar.setValue(0)
         self._progress_lbl.setText("شروع دانلود...")
-        self._log_edit.append(f"شروع دانلود: {url}")
+        self._log_edit.append("شروع دانلود: " + url)
 
         self._dl_thread = threading.Thread(
             target=self._download_bg,
@@ -542,12 +564,15 @@ def main():
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setApplicationName(APP_NAME)
+    app.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+    
     try:
         font = QFont(FONT_NAME)
         if font.exactMatch():
             app.setFont(font)
     except Exception:
         pass
+
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
