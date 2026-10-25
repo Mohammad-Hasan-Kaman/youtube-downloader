@@ -327,28 +327,35 @@ class MainWindow(QMainWindow):
         """)
 
     # ─── Fetch Info ────────────────────────────────────────────────────────
-    def _on_fetch_info(self):
-        url = parse_url(self._url_edit.text())
-        if not url:
-            self._show_error("لطفاً آدرس معتبر وارد کنید.")
-            return
-        self._btn_download.setEnabled(False)
-        self._btn_cancel.setEnabled(False)
-        self._video_formats_lbl.setText("در حال دریافت اطلاعات...")
-        self._audio_formats_lbl.setText("در حال دریافت اطلاعات...")
-        self._log_edit.append(f"دریافت اطلاعات: {url}")
-        self._info_thread = threading.Thread(target=self._fetch_info_bg, args=(url,), daemon=True)
-        self._info_thread.start()
-
     def _fetch_info_bg(self, url):
-        info = self._worker.fetch_info(url)
-        if info:
-            self._current_info = info
-            self._video_formats = info.get("formats", [])
-            self._audio_formats = [f for f in self._video_formats if f.get("acodec") != "none" and f.get("vcodec") == "none"]
-            self._display_formats()
-            self._worker.info_fetched.emit(info)
-            self._btn_download.setEnabled(True)
+        opts = {
+            "quiet": True,
+            "skip_download": True,
+            "extract_flat": False,
+            "writethumbnail": False,
+        }
+        proxy = self._tunnel.proxy_url
+        if proxy:
+            opts["proxy"] = proxy
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info:
+                self._current_info = info
+                self._video_formats = [
+                    f for f in info.get("formats", [])
+                    if f.get("acodec") != "none" and f.get("vcodec") != "none"
+                    and f.get("height") is not None
+                ]
+                self._audio_formats = [
+                    f for f in info.get("formats", [])
+                    if f.get("acodec") != "none" and f.get("vcodec") == "none"
+                ]
+                self._display_formats()
+                self._btn_download.setEnabled(True)
+                self._log_edit.append(f"✓ اطلاعات دریافت شد: {info.get('title', '?')}")
+        except Exception as e:
+            self._show_error(f"خطا در دریافت اطلاعات: {e}")
 
     def _display_formats(self):
         # Video: muxed, sorted by height desc

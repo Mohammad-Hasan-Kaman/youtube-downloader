@@ -3,3 +3,4 @@ PySide6-Essentials
 PyInstaller
 yt-dlp
 qdarkstyle
+browser_cookie3

@@ -26,6 +26,7 @@ class DownloadWorker(QObject):
             "merge_output_format": "mp4",
             "progress_with_title": True, "noplaylist": False,
             "writethumbnail": thumb, "simulate": False,
+            "extract_flat": False,
         }
         if self._ffmpeg:
             opts["ffmpeg_location"] = str(self._ffmpeg.parent)
@@ -33,6 +34,18 @@ class DownloadWorker(QObject):
             opts["writesubtitles"] = True
             opts["subtitleslangs"] = [sub_lang]
             opts["subtitlesformat"] = "srt/best"
+        # Try browser cookies first (bypasses bot detection)
+        # Note: browser_cookie3 requires admin on Windows Chrome 130+
+        try:
+            import browser_cookie3
+            for browser in ("chrome", "firefox", "edge", "brave"):
+                try:
+                    opts["cookies"] = browser_cookie3.browser(browser)
+                    break
+                except Exception:
+                    pass
+        except ImportError:
+            pass  # browser_cookie3 not available
         proxy = self.tunnel.proxy_url
         if proxy:
             opts["proxy"] = proxy
