@@ -1,3 +1,9 @@
+### 🌐 Telegram: [@mohaka_programmer](https://t.me/mohaka_programmer)
+
+[![Telegram](https://img.shields.io/badge/Telegram-%40mohaka__programmer-2CA5E0?logo=telegram&logoColor=white)](https://t.me/mohaka_programmer)
+
+---
+
 # 🚀 TubeX — YouTube Downloader Pro
 
 A modern, feature-rich YouTube downloader built with **PySide6** and **yt-dlp**, designed for users in restricted networks (Iran, etc.). Automatically tunnels traffic through **Aether** when YouTube is blocked — no manual configuration needed.
