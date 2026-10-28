@@ -1,0 +1,20 @@
+[2026-10-28T19:46:31.801Z INFO  aether] Aether v2.4.0
+[2026-10-28T19:46:31.802Z INFO  aether::sysprofile] [*] performance profile: High (cpus=12 mem=16199MB); scan concurrency cap=unlimited, udp socket buffer=7168KB, netstack tcp buffers=2048KB rx/512KB tx, netstack udp buffer=128KB, channel capacity=1024, h2 windows=16384KB/32768KB
+[2026-10-28T19:46:31.805Z INFO  aether] [+] loaded existing masque identity from C:\Users\Nik\AppData\Roaming/KamanTube/aether/aether-masque.toml
+[2026-10-28T19:46:31.809Z INFO  aether] [+] identity ready: device=aacf0124-8b45-4424-b06a-ed050c73f9b2 ipv4=172.16.0.2 ipv6=2606:4700:110:8025:97bd:cd3:f9a3:6b76
+[2026-10-28T19:46:31.809Z INFO  aether] [+] ECH off; the server name goes out in cleartext
+[2026-10-28T19:46:31.809Z INFO  aether] [*] verifying cached gateway 162.159.199.241:443 before reuse
+[2026-10-28T19:46:31.809Z INFO  aether] [+] obfuscation profile: firewall
+[2026-10-28T19:46:31.810Z INFO  aether::tls] tls verification: disabled (--tls-verify enables pinning; on by default with --team)
+[2026-10-28T19:46:34.667Z INFO  aether] [+] cached gateway 162.159.199.241:443 still works; skipping scan
+[2026-10-28T19:46:34.667Z INFO  aether] [+] using cloudflare edge 162.159.199.241:443
+[2026-10-28T19:46:34.668Z INFO  aether] [+] [masque] MASQUE transport: HTTP/2 (TCP) to 162.159.199.241:443 (inner mtu 1500)
+[2026-10-28T19:46:34.669Z INFO  aether::masque_h2] [h2] connecting tcp to 162.159.199.241:443
+[2026-10-28T19:46:34.910Z INFO  aether::masque_h2] [h2] tls established; alpn=
+[2026-10-28T19:46:34.910Z INFO  aether::masque_h2] [h2] flow control: stream window 16384KB, connection window 32768KB, max frame 64KB
+[2026-10-28T19:46:34.910Z INFO  aether::masque_h2] [h2] connect-ip request sent to cloudflareaccess.com
+[2026-10-28T19:46:35.059Z INFO  aether::masque_h2] [h2] connect-ip status: 200
+[2026-10-28T19:46:35.059Z INFO  aether::masque_h2] [h2] validating data-plane (end-to-end probe) before exposing socks5
+[2026-10-28T19:46:37.992Z INFO  aether::masque_h2] [h2] tunnel validated (end-to-end data confirmed); exposing socks5
+[2026-10-28T19:46:37.993Z INFO  aether::socks] [+] socks5 server listening on 127.0.0.1:1819
+[2026-10-28T19:46:38.466Z INFO  aether::exitloc] [+] masque exit: 104.28.214.161, IR via FRA, 473ms to cloudflare, warp on

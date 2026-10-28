@@ -1,32 +1,10 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
+# build outputs
+dist_out/
+.tmp-vendor/
+vendor/
 
-# Virtual environments
-venv/
-.venv/
-env/
-.env/
+# node
+node_modules/
 
-# PyInstaller
-build/
-dist/
-*.spec
-
-# App data
-%APPDATA%/TubeX/
-%LOCALAPPDATA%/TubeX/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Logs
-*.log
+# electron builder cache
+.config/

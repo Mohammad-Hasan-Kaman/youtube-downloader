@@ -1,0 +1,54 @@
+{
+  "name": "kamantube",
+  "productName": "KamanTube",
+  "version": "2.0.0",
+  "description": "A modern YouTube downloader with automatic censorship bypass",
+  "main": "main.js",
+  "author": " MohammadHasan Kaman",
+  "homepage": "https://github.com/Mohammad-Hasan-Kaman/youtube-downloader",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win",
+    "dist:portable": "electron-builder --win portable",
+    "fetch:binaries": "node scripts/fetch-binaries.js"
+  },
+  "build": {
+    "appId": "org.kamantube.app",
+    "productName": "KamanTube",
+    "directories": {
+      "output": "dist_out"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "!dist/**",
+      "!dist_out/**"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor",
+        "to": "vendor",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "40.10.2",
+    "electron-builder": "^25.1.8"
+  }
+}
