@@ -6,7 +6,7 @@ const TARGET = process.argv[2];
 const OUT = process.argv[3];
 
 async function main() {
-  const list = await (await fetch('http://127.0.0.1:9222/json/list')).json();
+  const list = await (await fetch(`http://127.0.0.1:${process.env.CDP_PORT || 9222}/json/list`)).json();
   const page = list.find((t) => t.type === 'page');
   const url = page ? page.webSocketDebuggerUrl : `ws://127.0.0.1:9222/devtools/page/${TARGET}`;
   const ws = new WebSocket(url);
