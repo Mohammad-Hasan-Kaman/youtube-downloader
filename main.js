@@ -39,7 +39,10 @@ app.whenReady().then(() => {
   yt = new YtdlpService(vendorDir);
   tunnel = new TunnelManager(vendorDir);
 
-  tunnel.on('status', (s) => win && win.webContents.send('tunnel:status', s));
+  tunnel.on('status', (s) => {
+    if (win) win.webContents.send('tunnel:status', s);
+    applySessionProxy();
+  });
   tunnel.on('log', (msg) => win && win.webContents.send('tunnel:log', msg));
 
   yt.on('event', (e) => win && win.webContents.send('yt:event', e));
@@ -47,7 +50,40 @@ app.whenReady().then(() => {
   createWindow(isDev);
   // Warm up connection in background once the UI is up
   setTimeout(() => { tunnel.ensure().catch(() => {}); }, 800);
+
+  // Watchdog: if the tunnel dies mid-download, reconnect automatically.
+  setInterval(() => watchTunnel(), 25000);
 });
+
+let tunnelCheckBusy = false;
+async function watchTunnel() {
+  if (!tunnel || !tunnel.usingTunnel || !tunnel.port) return;
+  if (tunnel.ensureRunning || tunnelCheckBusy) return;
+  tunnelCheckBusy = true;
+  try {
+    const ok = await tunnel.verifyProxy(tunnel.proxyUrl(), 15000);
+    if (!ok) {
+      tunnel.emit('log', 'Tunnel health check failed - reconnecting...');
+      tunnel.stop();
+      await tunnel.ensure().catch(() => {});
+    }
+  } catch (_) { /* keep going */ } finally {
+    tunnelCheckBusy = false;
+  }
+}
+
+/** Route the renderer's own web traffic (thumbnails etc.) through the tunnel when it is up. */
+function applySessionProxy() {
+  if (!win) return;
+  const rules = tunnel && tunnel.usingTunnel
+    ? `socks5://127.0.0.1:${tunnel.port}`
+    : '';
+  win.webContents.session.setProxy({
+    mode: rules ? 'fixed_servers' : 'direct',
+    proxyRules: rules,
+    proxyBypassRules: '<local>',
+  }).catch(() => {});
+}
 
 function createWindow(isDev) {
   const i18n = getI18n(state.get('language'));
@@ -91,14 +127,35 @@ function createWindow(isDev) {
 
 /* ------------------------------------------------------------------ IPC --- */
 
-// Language
+// Language - send the new language AND strings so the renderer can re-render fully
 ipcMain.handle('lang:get', () => ({
   language: state.get('language', 'fa'),
   strings: getI18n(state.get('language', 'fa')),
 }));
 ipcMain.handle('lang:set', (_e, lang) => {
   state.set('language', lang);
-  if (win) win.webContents.send('lang:updated', getI18n(lang));
+  if (win) win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
+});
+
+// Settings
+ipcMain.handle('settings:get', (_e, key) => state.get(key, null));
+ipcMain.handle('settings:set', (_e, key, value) => { state.set(key, value); return true; });
+ipcMain.handle('settings:reset', () => {
+  state.reset();
+  if (tunnel) tunnel.stop();
+  return true;
+});
+
+// Theme / tunnel mode
+ipcMain.handle('theme:set', (_e, theme) => { state.set('theme', theme); return true; });
+ipcMain.handle('tunnelMode:get', () => state.get('tunnelMode', 'auto'));
+ipcMain.handle('tunnelMode:set', (_e, mode) => {
+  state.set('tunnelMode', mode);
+  if (tunnel) {
+    if (mode === 'direct') tunnel.stop();
+    else tunnel.ensure().catch(() => {});
+  }
+  return true;
 });
 
 // Tunnel / network info
@@ -127,7 +184,19 @@ ipcMain.handle('paths:downloads', async () => {
 });
 ipcMain.handle('paths:pick', async () => {
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] });
-  return r.canceled ? null : r.filePaths[0];
+  if (r.canceled) return null;
+  const d = r.filePaths[0];
+  state.set('downloadDir', d);
+  return d;
+});
+ipcMain.handle('paths:open', async (_e, p) => {
+  if (!p || typeof p !== 'string') return false;
+  try {
+    if (fs.existsSync(p)) { shell.openPath(p); return true; }
+    const dir = path.dirname(p);
+    if (fs.existsSync(dir)) { shell.openPath(dir); return true; }
+  } catch (_) { /* ignore */ }
+  return false;
 });
 
 app.on('window-all-closed', () => {

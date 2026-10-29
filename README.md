@@ -47,12 +47,11 @@ never started.
 
 ## Install
 
-Grab the latest installer or portable `.exe` from the
+Grab the latest installer from the
 [**Releases**](https://github.com/Mohammad-Hasan-Kaman/youtube-downloader/releases)
 page.
 
 - `KamanTube-Setup-*.exe` — installer
-- `KamanTube-*-portable.exe` — single portable executable
 
 All required runtime binaries (Aether core, yt-dlp, ffmpeg) ship **inside**
 the build, so it works out of the box.

@@ -24,4 +24,13 @@ contextBridge.exposeInMainWorld('kaman', {
   // paths
   getDownloads: () => ipcRenderer.invoke('paths:downloads'),
   pickDir: () => ipcRenderer.invoke('paths:pick'),
+  openFolder: (p) => ipcRenderer.invoke('paths:open', p),
+
+  // settings
+  settingGet: (k) => ipcRenderer.invoke('settings:get', k),
+  settingSet: (k, v) => ipcRenderer.invoke('settings:set', k, v),
+  resetConfig: () => ipcRenderer.invoke('settings:reset'),
+  themeSet: (t) => ipcRenderer.invoke('theme:set', t),
+  tunnelModeGet: () => ipcRenderer.invoke('tunnelMode:get'),
+  tunnelModeSet: (m) => ipcRenderer.invoke('tunnelMode:set', m),
 });

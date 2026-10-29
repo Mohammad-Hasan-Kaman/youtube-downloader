@@ -347,7 +347,17 @@ class TunnelManager extends EventEmitter {
       this.isActive = true;
 
       // 2) does the network even need help?
-      if (!BLOCKED_COUNTRIES.includes(this.lastCountry)) {
+      const tunnelMode = state.get('tunnelMode', 'auto');
+      if (tunnelMode === 'direct') {
+        this.usingTunnel = false;
+        this.protocolLabel = null;
+        this.emitStatus(); // state: 'direct'
+        this.emit('log', 'Tunnel disabled by user (direct mode)');
+        return;
+      }
+      const needsTunnel = BLOCKED_COUNTRIES.includes(this.lastCountry)
+        || tunnelMode === 'forced';
+      if (!needsTunnel) {
         this.usingTunnel = false;
         this.protocolLabel = null;
         this.emitStatus(); // state: 'direct'

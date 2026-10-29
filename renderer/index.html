@@ -34,6 +34,7 @@
           <span data-i18n="queue"></span><span class="badge" id="queue-badge" hidden>0</span>
         </button>
         <button class="nav-btn" data-view="history" data-i18n="history"></button>
+        <button class="nav-btn" data-view="settings" data-i18n="settings"></button>
       </nav>
 
       <div class="sidebar-foot">
@@ -49,6 +50,7 @@
           <button class="mini-btn" id="btn-dir" data-i18n="change"></button>
         </div>
         <div class="dir-path" id="dir-path"></div>
+        <button class="mini-btn wide" id="btn-open-folder" data-i18n="openFolder"></button>
       </div>
     </aside>
 
@@ -113,18 +115,8 @@
               <div class="opt-row">
                 <div class="opt">
                   <label data-i18n="subtitle"></label>
-                  <select id="v-subs">
-                    <option value="" data-i18n="none"></option>
-                    <option value="fa,en">fa + en</option>
-                    <option value="fa">fa</option>
-                    <option value="en">en</option>
-                    <option value="ar">ar</option>
-                  </select>
+                  <div id="v-subs-btns"></div>
                 </div>
-                <label class="opt chk">
-                  <input type="checkbox" id="v-thumbdl" />
-                  <span>Thumbnail</span>
-                </label>
                 <div class="grow"></div>
                 <button class="btn primary" id="btn-addq" data-i18n="download"></button>
                 <button class="btn ghost" id="btn-audio" data-i18n="audio"></button>
@@ -163,6 +155,51 @@
           <h2 data-i18n="history"></h2>
           <div id="history-items" class="queue-list history"></div>
           <div class="empty" id="history-empty" data-i18n="emptyHistory"></div>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="view-pane" id="pane-settings">
+          <h2 data-i18n="settings"></h2>
+          <div class="settings-grid">
+            <fieldset class="setting-group">
+              <legend data-i18n="themeTitle"></legend>
+              <div class="seg">
+                <button class="seg-b" data-theme="dark" data-i18n="themeDark"></button>
+                <button class="seg-b" data-theme="light" data-i18n="themeLight"></button>
+                <button class="seg-b" data-theme="auto" data-i18n="themeAuto"></button>
+              </div>
+            </fieldset>
+            <fieldset class="setting-group">
+              <legend data-i18n="downloadOptions"></legend>
+              <label class="opt chk">
+                <input type="checkbox" id="s-embed-subs" />
+                <span data-i18n="embedSubs"></span>
+              </label>
+              <label class="opt chk">
+                <input type="checkbox" id="s-embed-thumb" />
+                <span data-i18n="embedThumb"></span>
+              </label>
+              <label class="opt chk">
+                <input type="checkbox" id="s-separate-files" />
+                <span data-i18n="separateFiles"></span>
+              </label>
+            </fieldset>
+            <fieldset class="setting-group">
+              <legend data-i18n="tunnelTitle"></legend>
+              <div class="opt">
+                <label data-i18n="tunnelMode"></label>
+                <select id="s-tunnel-mode">
+                  <option value="auto" data-i18n="auto"></option>
+                  <option value="forced" data-i18n="forced"></option>
+                  <option value="direct" data-i18n="tunnelModeDirect"></option>
+                </select>
+              </div>
+            </fieldset>
+            <fieldset class="setting-group">
+              <legend data-i18n="advanced"></legend>
+              <button class="btn secondary" id="btn-reset-config" data-i18n="resetConfig"></button>
+            </fieldset>
+          </div>
         </div>
       </section>
     </main>

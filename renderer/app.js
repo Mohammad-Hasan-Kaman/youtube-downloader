@@ -16,6 +16,12 @@ let queueItems = [];
 let historyItems = [];
 let running = 0;      // concurrent downloads
 const MAX_CONCURRENT = 2;
+let currentPlaylist = null;
+let lastDir = '';
+let selectedSubLang = null;
+let sEmbedSubs = true;
+let sEmbedThumb = true;
+let sSeparate = false;
 
 /* ------------------------------------------------------------- helpers */
 
@@ -78,7 +84,7 @@ async function loadLang() {
 function applyLangMeta(language) {
   document.documentElement.lang = language;
   document.documentElement.dir = language === 'fa' ? 'rtl' : 'ltr';
-  qsAll('.seg-b').forEach((b) => b.classList.toggle('active', b.dataset.lang === language));
+  qsAll('.seg-b[data-lang]').forEach((b) => b.classList.toggle('active', b.dataset.lang === language));
   qs('#search-input').placeholder = T.searchPlaceholder || '';
 }
 
@@ -206,8 +212,21 @@ function renderVideo(v) {
   qs('#v-views').textContent = v.views ? `${T.viewsLabel}: ${fmtViews(v.views)}` : '';
   qs('#v-date').textContent = v.uploadDate
     ? `${v.uploadDate.slice(0, 4)}-${v.uploadDate.slice(4, 6)}-${v.uploadDate.slice(6, 8)}` : '';
-  qs('#v-subs').value = '';
-  qs('#v-thumbdl').checked = false;
+
+  // subtitle buttons
+  const subs = v.subtitles || [];
+  const subBtns = qs('#v-subs-btns');
+  subBtns.className = 'sub-btns';
+  subBtns.innerHTML = (subs.length ? `<button class="sub-btn active" data-lang="">${T.none}</button>` : `<button class="sub-btn active" data-lang="">${T.none}</button>`) +
+    subs.map(s => `<button class="sub-btn" data-lang="${s.lang}">${s.name} (${s.lang})</button>`).join('');
+  selectedSubLang = null;
+  subBtns.querySelectorAll('.sub-btn').forEach(b => {
+    b.onclick = () => {
+      subBtns.querySelectorAll('.sub-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      selectedSubLang = b.dataset.lang || null;
+    };
+  });
 
   const grid = qs('#q-grid');
   grid.innerHTML = (v.qualities || []).map((q, i) => `
@@ -238,10 +257,17 @@ function enqueue(kind) {
   const job = {
     id: 'u' + Date.now() + Math.random().toString(36).slice(2, 5),
     url, title,
+    thumb: currentVideo.thumb || '',
     kind,
     formatId: kind === 'audio' ? null : selectedQuality,
-    subLang: kind === 'video' ? (qs('#v-subs').value || null) : null,
-    thumbnail: kind === 'video' ? qs('#v-thumbdl').checked : false,
+    qualityLabel: kind === 'video'
+      ? `${selectedQuality ? selectedQuality.split('+')[0].replace(/[^0-9]/g, '') + 'p' : 'Best'}`
+      : '',
+    subLang: kind === 'video' ? selectedSubLang : null,
+    thumbnail: true,                                   // always fetch; embed vs separate per settings
+    embedSubs: kind === 'video' ? !!sEmbedSubs : false,
+    embedThumb: kind === 'video' ? !!sEmbedThumb : false,
+    separateFiles: kind === 'video' ? !!sSeparate : false,
     state: 'wait', pct: 0, speed: '', outDir: lastDir,
   };
   queueItems.unshift(job);
@@ -253,7 +279,6 @@ function enqueue(kind) {
 
 /* ------------------------------------------------------------ playlist */
 
-let currentPlaylist = null;
 function renderPlaylist(pl) {
   currentPlaylist = pl;
   qs('#pl-thumb').src = pl.entries?.[0]?.thumb || '';
@@ -275,8 +300,9 @@ function enqueuePlaylist() {
   sel.reverse().forEach((e) => {
     queueItems.unshift({
       id: 'u' + Date.now() + Math.random().toString(36).slice(2, 5),
-      url: e.url, title: e.title, kind: 'best',
-      formatId: 'best', state: 'wait', pct: 0, speed: '',
+      url: e.url, title: e.title, thumb: e.thumb || '', kind: 'best',
+      formatId: 'best', qualityLabel: 'Best', state: 'wait', pct: 0, speed: '',
+      embedSubs: !!sEmbedSubs, embedThumb: !!sEmbedThumb, separateFiles: !!sSeparate,
       outDir: lastDir + '\\' + (currentPlaylist.title || 'Playlist').replace(/[\\/:*?"<>|]/g, '_'),
     });
   });
@@ -313,6 +339,7 @@ function renderQueue() {
         ${j.state === 'error' ? `<span class="status-tag st-fail">${T.failed}</span>` : ''}
         ${j.state === 'canceled' ? `<span class="status-tag st-wait">${T.canceled}</span>` : ''}
       </div>
+      ${j.state === 'error' ? `<button class="mini-btn" data-retry="${j.id}">${T.retry}</button>` : ''}
       ${(j.state === 'wait' || j.state === 'down' || j.state === 'merge') ? `<button class="cancel-x" data-cancel="${j.id}">✕</button>` : ''}
     </div>`).join('');
   box.querySelectorAll('[data-cancel]').forEach((b) => {
@@ -322,6 +349,12 @@ function renderQueue() {
       if (job && job.state === 'down') window.kaman.cancel(id);
       if (job && ['wait', 'merge'].includes(job.state)) { job.state = 'canceled'; pumpQueue(); }
       renderQueue();
+    };
+  });
+  box.querySelectorAll('[data-retry]').forEach((b) => {
+    b.onclick = () => {
+      const job = queueItems.find((j) => j.id === b.dataset.retry);
+      if (job) { job.state = 'wait'; job.pct = 0; job.speed = 0; pumpQueue(); renderQueue(); }
     };
   });
 }
@@ -349,6 +382,34 @@ async function startDownload(job) {
   }
 }
 
+/** In-place update of one queue row (no full rebuild -> no flicker). */
+function updateQueueRow(job) {
+  const row = document.querySelector(`.queue-item[data-id="${job.id}"]`);
+  if (!row) return;
+  const fill = row.querySelector('.qi-fill');
+  const stat = row.querySelector('.qi-stat');
+  if (fill) fill.style.width = `${job.pct || 0}%`;
+  if (stat) {
+    if (job.state === 'down') {
+      stat.innerHTML = `<strong>${Math.round(job.pct || 0)}%</strong><br>${fmtSize(job.speed)}/s`;
+    } else if (job.state === 'merge') {
+      stat.innerHTML = `<span class="status-tag st-merge">${T.mergeProgress}</span>`;
+    } else if (job.state === 'done') {
+      stat.innerHTML = `<span class="status-tag st-done">${T.done}</span>`;
+    } else if (job.state === 'error') {
+      stat.innerHTML = `<span class="status-tag st-fail">${T.failed}</span>`;
+    } else if (job.state === 'canceled') {
+      stat.innerHTML = `<span class="status-tag st-wait">${T.canceled}</span>`;
+    } else {
+      stat.innerHTML = `<span class="status-tag st-wait">${T.toQueue}</span>`;
+    }
+  }
+  if (job.state === 'error' || job.state === 'done' || job.state === 'canceled') {
+    const btn = row.querySelector('.cancel-x');
+    if (btn) btn.remove();
+  }
+}
+
 const applyYtEvent = (e) => {
   const job = queueItems.find((j) => j.id === e.id);
   if (!job) return;
@@ -356,33 +417,44 @@ const applyYtEvent = (e) => {
     job.state = 'down';
     job.pct = e.pct || 0;
     job.speed = e.speed || 0;
-  } else if (e.type === 'merging') job.state = 'merge';
-  else if (e.type === 'done') {
+    // throttled in-place update — no rebuild
+    scheduleUiRefresh(job, 250);
+  } else if (e.type === 'merging') {
+    job.state = 'merge';
+    renderQueue();
+  } else if (e.type === 'done') {
     job.state = 'done'; running--;
-    historyItems.unshift({ title: job.title, url: job.url, when: Date.now() });
+    historyItems.unshift({ title: job.title, url: job.url, when: Date.now(), thumb: job.thumb, outDir: job.outDir });
     localStorage.setItem('kt_history', JSON.stringify(historyItems.slice(0, 60)));
     toast(T.toHistory, 'ok');
     updateQueueBadge();
+    renderQueue();
+    pumpQueue();
   } else if (e.type === 'error') {
     job.state = 'error'; running--;
     toast(`${T.failed}: ${e.message || ''}`, 'err');
     updateQueueBadge();
+    renderQueue();
+    pumpQueue();
   } else if (e.type === 'canceled') {
     job.state = 'canceled'; running--;
     updateQueueBadge();
+    renderQueue();
+    pumpQueue();
   }
   updateQueueBadge();
-  if (qs('#pane-queue').classList.contains('active')) renderQueue();
-  else scheduleUiRefresh();
 };
 
 let uiTimer = null;
-const scheduleUiRefresh = () => {
-  if (uiTimer) return;
+let uiJob = null;
+const scheduleUiRefresh = (job, delay) => {
+  if (uiTimer && uiJob === job) return;
+  if (uiTimer) clearTimeout(uiTimer);
   uiTimer = setTimeout(() => {
     uiTimer = null;
-    if (qs('#pane-queue').classList.contains('active')) renderQueue();
-  }, 800);
+    if (job) updateQueueRow(job);
+    else if (qs('#pane-queue').classList.contains('active')) renderQueue();
+  }, delay || 800);
 };
 
 /* ------------------------------------------------------------- history */
@@ -393,20 +465,26 @@ function renderHistory() {
   qs('#history-empty').hidden = items.length > 0;
   box.innerHTML = items.map((h) => `
     <div class="queue-item">
+      ${h.thumb ? `<img src="${h.thumb}" onerror="this.style.display='none'">` : ''}
       <div class="qi-mid">
         <div class="qi-title">${esc(h.title)}</div>
         <div class="qi-sub">${new Date(h.when).toLocaleString()}</div>
       </div>
-      <div class="qi-stat"><button class="mini-btn" data-open="${esc(h.url)}">${T.copyUrl}</button></div>
+      <div class="grow"></div>
+      <div class="qi-stat">
+        <button class="mini-btn" data-open="${esc(h.url)}">${T.copyUrl}</button>
+        ${h.outDir ? `<button class="mini-btn" data-folder="${esc(h.outDir)}">${T.openFolder}</button>` : ''}
+      </div>
     </div>`).join('');
   box.querySelectorAll('[data-open]').forEach((b) => {
     b.onclick = () => navigator.clipboard.writeText(b.dataset.open) && toast(T.copyUrl, 'ok');
   });
+  box.querySelectorAll('[data-folder]').forEach((b) => {
+    b.onclick = () => window.kaman.openFolder(b.dataset.folder);
+  });
 }
 
 /* ---------------------------------------------------------------- init */
-
-let lastDir = '';
 
 async function init() {
   await loadLang();
@@ -432,7 +510,24 @@ async function init() {
   });
 
   window.kaman.onYtEvent(applyYtEvent);
-  window.kaman.onLang((s) => { T = s; applyStrings(); applyLangMeta(document.documentElement.lang || 'fa'); });
+
+  // Full language switch: swap every string and re-render dynamic panes.
+  window.kaman.onLang((payload) => {
+    T = payload.strings || payload;           // main sends {language, strings}
+    const lang = payload.language || 'fa';
+    applyLangMeta(lang);
+    applyStrings();
+    // refresh strings that live inside dynamically-built content
+    if (currentVideo) {
+      const subBtns = qs('#v-subs-btns');
+      if (subBtns) subBtns.querySelector('.sub-btn[data-lang=""]').textContent = T.none;
+      qs('#q-hint').textContent = currentVideo.audio
+        ? `${T.audio}: ${currentVideo.audio.abr}kbps · ${fmtSize(currentVideo.audio.size)}` : '';
+    }
+    if (qs('#pane-queue').classList.contains('active')) renderQueue();
+    if (qs('#pane-history').classList.contains('active')) renderHistory();
+    renderNet();
+  });
 
   // nav
   qsAll('.nav-btn[data-view]').forEach((b) => b.onclick = () => show(b.dataset.view));
@@ -462,10 +557,62 @@ async function init() {
     if (d) { lastDir = d; qs('#dir-path').textContent = d; }
   };
 
+  qs('#btn-open-folder').onclick = async () => {
+    await window.kaman.openFolder(lastDir);
+  };
+
+  // theme
+  qsAll('[data-theme]').forEach((b) => {
+    b.onclick = async () => {
+      const theme = b.dataset.theme;
+      document.documentElement.dataset.theme = theme;
+      await window.kaman.themeSet(theme);
+      qsAll('[data-theme]').forEach(x => x.classList.toggle('active', x.dataset.theme === theme));
+    };
+  });
+
+  // tunnel mode
+  const tunnelModeSel = qs('#s-tunnel-mode');
+  if (tunnelModeSel) {
+    tunnelModeSel.onchange = async () => {
+      await window.kaman.tunnelModeSet(tunnelModeSel.value);
+    };
+  }
+
+  // reset config
+  qs('#btn-reset-config').onclick = async () => {
+    if (confirm(T.confirmReset || 'Reset all settings?')) {
+      await window.kaman.resetConfig();
+      location.reload();
+    }
+  };
+
   // language
-  qsAll('.seg-b').forEach((b) => b.onclick = async () => {
+  qsAll('.seg-b[data-lang]').forEach((b) => b.onclick = async () => {
     await window.kaman.langSet(b.dataset.lang);
   });
+
+  // load saved settings
+  const savedTheme = await window.kaman.themeGet();
+  if (savedTheme) {
+    document.documentElement.dataset.theme = savedTheme;
+    qsAll('[data-theme]').forEach(x => x.classList.toggle('active', x.dataset.theme === savedTheme));
+  }
+  const savedTunnelMode = await window.kaman.tunnelModeGet();
+  if (savedTunnelMode && tunnelModeSel) {
+    tunnelModeSel.value = savedTunnelMode;
+  }
+  const savedEmbedSubs = await window.kaman.settingGet('embedSubs');
+  if (savedEmbedSubs !== null) { sEmbedSubs = !!savedEmbedSubs; qs('#s-embed-subs').checked = sEmbedSubs; }
+  const savedEmbedThumb = await window.kaman.settingGet('embedThumb');
+  if (savedEmbedThumb !== null) { sEmbedThumb = !!savedEmbedThumb; qs('#s-embed-thumb').checked = sEmbedThumb; }
+  const savedSeparateFiles = await window.kaman.settingGet('separateFiles');
+  if (savedSeparateFiles !== null) { sSeparate = !!savedSeparateFiles; qs('#s-separate-files').checked = sSeparate; }
+
+  // watch for settings changes to save
+  qs('#s-embed-subs').onchange = () => { sEmbedSubs = qs('#s-embed-subs').checked; window.kaman.settingSet('embedSubs', sEmbedSubs); };
+  qs('#s-embed-thumb').onchange = () => { sEmbedThumb = qs('#s-embed-thumb').checked; window.kaman.settingSet('embedThumb', sEmbedThumb); };
+  qs('#s-separate-files').onchange = () => { sSeparate = qs('#s-separate-files').checked; window.kaman.settingSet('separateFiles', sSeparate); };
 
   // focus search
   qs('#search-input').focus();

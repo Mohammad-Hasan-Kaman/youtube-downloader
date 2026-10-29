@@ -57,6 +57,10 @@ module.exports = {
     data_[key] = value;
     save();
   },
+  reset() {
+    data_ = {};
+    try { fs.rmSync(file(), { force: true }); } catch (_) { /* ignore */ }
+  },
   data: load,
   file,
 };

@@ -162,6 +162,17 @@ class YtdlpService extends EventEmitter {
       if (!bestAudio || score > bestAudio._s) { f._s = score; bestAudio = f; }
     }
 
+    // real available subtitles (language + human name)
+    const subMap = o.subtitles || {};
+    const subtitles = Object.entries(subMap)
+      .filter(([, tracks]) => Array.isArray(tracks) && tracks.length)
+      .map(([lang]) => {
+        try {
+          const r = new Intl.DisplayNames(['fa'], { type: 'language' });
+          return { lang, name: r.of(lang) || lang };
+        } catch (_) { return { lang, name: lang }; }
+      });
+
     return {
       type: 'video',
       id: o.id,
@@ -173,6 +184,7 @@ class YtdlpService extends EventEmitter {
       thumb: o.thumbnail || o.thumbnails?.[o.thumbnails?.length - 1]?.url || '',
       uploadDate: o.upload_date || '',
       description: (o.description || '').slice(0, 1200),
+      subtitles,
       qualities,
       audio: bestAudio && {
         formatId: bestAudio.format_id,
@@ -190,6 +202,9 @@ class YtdlpService extends EventEmitter {
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
     const isAudio = job.kind === 'audio';
+    const embedSubs = job.embedSubs !== false;    // default: embedded into the video
+    const embedThumb = job.embedThumb !== false;  // default: embedded into the video
+    const separate = !!job.separateFiles;         // optional: keep extra files
     const args = [
       '--no-warnings',
       '--newline',
@@ -211,18 +226,40 @@ class YtdlpService extends EventEmitter {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best');
     }
 
+    // Subtitles: embed into the file by default; separate .srt only if requested.
     if (job.subLang) {
-      args.push('--write-sub', '--sub-langs', job.subLang,
-        '--convert-subs', 'srt');
+      if (separate) {
+        args.push('--write-sub', '--sub-langs', job.subLang, '--convert-subs', 'srt');
+      } else if (embedSubs) {
+        args.push('--embed-subs', '--sub-langs', job.subLang, '--convert-subs', 'srt');
+      }
     }
+    // Thumbnail: embed into the file by default; separate file only if requested.
     if (job.thumbnail) {
-      args.push('--write-thumbnail');
+      if (separate) {
+        args.push('--write-thumbnail');
+      } else if (embedThumb) {
+        args.push('--embed-thumbnail');
+      }
     }
     args.push(job.url);
 
     const id = job.id || `j${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
     const child = spawn(this.binPath(), args, { windowsHide: true });
     this._jobs.set(id, child);
+    // if the connection dies, yt-dlp can hang silently - kill it so the
+    // queue keeps moving and the tunnel watchdog can reconnect.
+    let lastActivity = Date.now();
+    const hangWatch = setInterval(() => {
+      if (Date.now() - lastActivity > 180000) {
+        clearInterval(hangWatch);
+        this._jobs.delete(id);
+        const { spawn: sp } = require('child_process');
+        try { sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }); } catch (_) { child.kill('SIGTERM'); }
+        send({ type: 'error', message: 'download stalled (no progress for 3 min) - tunnel reconnecting' });
+      }
+    }, 30000);
+    child.once('exit', () => clearInterval(hangWatch));
 
     const send = (e) => this.emit('event', { id, ...e, url: job.url, title: job.title });
 
@@ -230,6 +267,7 @@ class YtdlpService extends EventEmitter {
 
     let lastPct = -1;
     child.stdout.on('data', (chunk) => {
+      lastActivity = Date.now();
       for (const line of chunk.toString().split('\n')) {
         const m = /\[download\]\s+([\d.]+)% of\s+~?\s*([\d.]+)(KiB|MiB|GiB) at\s+([\d.]+)(KiB|MiB|GiB)\/s ETA (\d+):(\d+)/.exec(line)
           || /\[download\]\s+([\d.]+)% of\s+~?\s*([\d.]+)(KiB|MiB|GiB) at\s+([\d.]+)(KiB|MiB|GiB)\/s/.exec(line);
@@ -254,6 +292,7 @@ class YtdlpService extends EventEmitter {
     });
 
     child.stderr.on('data', (chunk) => {
+      lastActivity = Date.now();
       const t = chunk.toString();
       if (t.trim()) send({ type: 'log', message: t.trim().slice(0, 300) });
     });
