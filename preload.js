@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('kaman', {
   settingGet: (k) => ipcRenderer.invoke('settings:get', k),
   settingSet: (k, v) => ipcRenderer.invoke('settings:set', k, v),
   resetConfig: () => ipcRenderer.invoke('settings:reset'),
+  themeGet: () => ipcRenderer.invoke('theme:get'),
   themeSet: (t) => ipcRenderer.invoke('theme:set', t),
   tunnelModeGet: () => ipcRenderer.invoke('tunnelMode:get'),
   tunnelModeSet: (m) => ipcRenderer.invoke('tunnelMode:set', m),

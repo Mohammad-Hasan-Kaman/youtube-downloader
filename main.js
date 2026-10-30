@@ -147,6 +147,7 @@ ipcMain.handle('settings:reset', () => {
 });
 
 // Theme / tunnel mode
+ipcMain.handle('theme:get', () => state.get('theme', 'dark'));
 ipcMain.handle('theme:set', (_e, theme) => { state.set('theme', theme); return true; });
 ipcMain.handle('tunnelMode:get', () => state.get('tunnelMode', 'auto'));
 ipcMain.handle('tunnelMode:set', (_e, mode) => {
