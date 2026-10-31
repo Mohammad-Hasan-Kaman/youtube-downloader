@@ -52,7 +52,9 @@ app.whenReady().then(() => {
   setTimeout(() => { tunnel.ensure().catch(() => {}); }, 800);
 
   // Watchdog: if the tunnel dies mid-download, reconnect automatically.
-  setInterval(() => watchTunnel(), 25000);
+  setInterval(() => watchTunnel(), 15000);
+  // Reconnect loop: if the tunnel is needed but down, keep trying (no lock).
+  setInterval(() => { tryTunnelAgain(); }, 30000);
 });
 
 let tunnelCheckBusy = false;
@@ -61,7 +63,7 @@ async function watchTunnel() {
   if (tunnel.ensureRunning || tunnelCheckBusy) return;
   tunnelCheckBusy = true;
   try {
-    const ok = await tunnel.verifyProxy(tunnel.proxyUrl(), 15000);
+    const ok = await tunnel.verifyProxy(tunnel.proxyUrl(), 12000);
     if (!ok) {
       tunnel.emit('log', 'Tunnel health check failed - reconnecting...');
       tunnel.stop();
@@ -69,6 +71,22 @@ async function watchTunnel() {
     }
   } catch (_) { /* keep going */ } finally {
     tunnelCheckBusy = false;
+  }
+}
+
+let retryBusy = false;
+async function tryTunnelAgain() {
+  if (!tunnel || !win) return;
+  if (retryBusy || tunnel.ensureRunning) return;
+  // only when the network actually needs the tunnel but it is down
+  if (tunnel.isActive && !tunnel.usingTunnel) {
+    const mode = state.get('tunnelMode', 'auto');
+    const needed = mode === 'forced'
+      || (tunnel.lastCountry && ['IR'].includes(tunnel.lastCountry));
+    if (needed) {
+      retryBusy = true;
+      try { await tunnel.ensure().catch(() => {}); } finally { retryBusy = false; }
+    }
   }
 }
 
@@ -127,14 +145,18 @@ function createWindow(isDev) {
 
 /* ------------------------------------------------------------------ IPC --- */
 
-// Language - send the new language AND strings so the renderer can re-render fully
+// Language - user asked for a real full restart so every string flips RTL/LTR
 ipcMain.handle('lang:get', () => ({
   language: state.get('language', 'fa'),
   strings: getI18n(state.get('language', 'fa')),
 }));
 ipcMain.handle('lang:set', (_e, lang) => {
   state.set('language', lang);
-  if (win) win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
+  if (win) {
+    win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
+    // full reload -> complete RTL/LTR flip on every element
+    setTimeout(() => win.webContents.reload(), 120);
+  }
 });
 
 // Settings
@@ -171,10 +193,16 @@ ipcMain.handle('tunnel:get', async () => ({
 ipcMain.handle('tunnel:recheck', async () => { await tunnel.ensure(); return null; });
 
 // yt-dlp operations
-ipcMain.handle('yt:search', async (_e, q, proxy) => yt.search(q, proxy));
-ipcMain.handle('yt:info', async (_e, url, proxy) => yt.info(url, proxy));
-ipcMain.handle('yt:playlist', async (_e, url, proxy) => yt.playlist(url, proxy));
-ipcMain.handle('yt:download', async (_e, job, proxy) => yt.download(job, proxy));
+// If the renderer didn't know the tunnel is up yet (tunnel connects in
+// background), fall back to the live tunnel proxy automatically.
+function withProxy(proxy) {
+  if (proxy) return proxy;
+  return (tunnel && tunnel.usingTunnel) ? tunnel.proxyUrl() : '';
+}
+ipcMain.handle('yt:search', async (_e, q, proxy) => yt.search(q, withProxy(proxy)));
+ipcMain.handle('yt:info', async (_e, url, proxy) => yt.info(url, withProxy(proxy)));
+ipcMain.handle('yt:playlist', async (_e, url, proxy) => yt.playlist(url, withProxy(proxy)));
+ipcMain.handle('yt:download', async (_e, job, proxy) => yt.download(job, withProxy(proxy)));
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));
 
 // Paths

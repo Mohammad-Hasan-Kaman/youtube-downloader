@@ -294,6 +294,7 @@ class TunnelManager extends EventEmitter {
     this.proc = proc;
     let sawPort = false;
     const deadline = Date.now() + timeoutMs;
+    let slowTries = 0;
     while (Date.now() < deadline) {
       await sleep(1500);
       if (!sawPort) {
@@ -307,6 +308,11 @@ class TunnelManager extends EventEmitter {
             return { ok: true, proc, attempt };
           }
           sawPort = false; // port up but no traffic yet; keep polling
+          slowTries++;
+          if (slowTries > 4) {
+            this.emit('log', `${attempt.label}: route slow, trying next option...`);
+            break;
+          }
         }
       }
       if (this._rejecting) {
@@ -381,13 +387,16 @@ class TunnelManager extends EventEmitter {
       }
 
       const cached = state.get('tunnelRecipe');
-      const cachedAttempt = cached && ATTEMPTS.find((a) => a.id === cached);
-      const order = cachedAttempt ? [cachedAttempt] : ATTEMPTS;
+      // User requirement: ALWAYS try MASQUE h2 first, then the others.
+      // The cached recipe is only a hint for --quick-reconnect (already in
+      // buildArgs); it must NOT reorder attempts, otherwise a dead cached
+      // protocol (e.g. WireGuard endpoints) stalls every launch.
+      void cached;
 
       this.usingTunnel = false;
       this.emitStatus({ state: 'checking' }); // still direct while trying
 
-      for (const attempt of order) {
+      for (const attempt of ATTEMPTS) {
         this.emit('log', `Trying ${attempt.label}…`);
         const r = await this.runAttempt(attempt, 120000);
         if (r.ok) {
@@ -398,23 +407,6 @@ class TunnelManager extends EventEmitter {
           return;
         }
         this.emit('log', `${attempt.label} did not work`);
-      }
-
-      // cached attempt failed -> full reshuffle (fresh scan kept for last)
-      if (cachedAttempt) {
-        for (const attempt of ATTEMPTS) {
-          if (attempt.id === cachedAttempt.id) continue;
-          this.emit('log', `Trying ${attempt.label}…`);
-          const r = await this.runAttempt(attempt, 120000);
-          if (r.ok) {
-            state.set('tunnelRecipe', attempt.id);
-            await this._fetchExitIp();
-            this.emitStatus();
-            this.emit('log', `Connected via ${attempt.label}`);
-            return;
-          }
-          this.emit('log', `${attempt.label} did not work`);
-        }
       }
 
       this.emitStatus({ state: 'error' });

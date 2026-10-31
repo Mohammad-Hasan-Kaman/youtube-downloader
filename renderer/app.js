@@ -121,6 +121,9 @@ function show(view) {
   qsAll('.nav-btn').forEach((b) => b.classList.remove('active'));
   qs('#pane-' + view).classList.add('active');
   qs(`.nav-btn[data-view="${view}"]`).classList.add('active');
+  if (view === 'home' && !qs('#grid-results').children.length) {
+    qs('#hero-box').hidden = false;      // empty home -> welcome hero again
+  }
   if (view === 'queue') renderQueue();
   if (view === 'history') renderHistory();
 }
@@ -131,6 +134,7 @@ async function doSearch() {
   const q = qs('#search-input').value.trim();
   if (!q) return;
   qs('#home-empty').hidden = true;
+  qs('#hero-box').hidden = true;               // hide hero while searching
   const grid = qs('#grid-results');
   grid.innerHTML = '';
 
@@ -143,7 +147,7 @@ async function doSearch() {
       try { r = await window.kaman.playlist(q, proxy); } catch (_) { r = null; }
     }
     skel.remove();
-    if (!r) { qs('#home-empty').textContent = T.errorSearch; qs('#home-empty').hidden = false; return; }
+    if (!r) { qs('#home-empty').textContent = T.errorSearch; qs('#home-empty').hidden = false; qs('#hero-box').hidden = true; return; }
     if (r.type === 'video') { renderVideo(r); return; }
     renderPlaylist(r); return;
   }
@@ -157,6 +161,7 @@ async function doSearch() {
   if (!items.length) {
     qs('#home-empty').textContent = T.notFound;
     qs('#home-empty').hidden = false;
+    qs('#hero-box').hidden = true;
     return;
   }
   grid.innerHTML = items.map(cardHtml).join('');
@@ -176,21 +181,33 @@ function skeleton(n) {
 }
 
 function cardHtml(v) {
+  const isPl = v.type === 'playlist' || v.isPlaylist;
   return `
-    <div class="grid-item">
+    <div class="grid-item ${isPl ? 'is-playlist' : ''}">
       <div class="gi-thumb">
         ${v.thumb ? `<img src="${v.thumb}" loading="lazy" onerror="this.remove()">` : ''}
-        <div class="gi-dur">${fmtDur(v.duration)}</div>
+        ${isPl ? '<div class="gi-pl-badge">▶ ' + (T.playlistBadge || 'Playlist') + '</div>' : ''}
+        ${!isPl ? `<div class="gi-dur">${fmtDur(v.duration)}</div>` : ''}
       </div>
       <div class="gi-body">
         <div class="gi-title">${esc(v.title)}</div>
         <div class="gi-channel">${esc(v.uploader)}</div>
-        <div class="gi-meta">${fmtViews(v.views) || ''}</div>
+        <div class="gi-meta">${isPl ? (v.count ? v.count + ' ' + (T.items || 'items') : T.playlistBadge || 'Playlist') : (fmtViews(v.views) || '')}</div>
       </div>
     </div>`;
 }
 
 async function playResult(v) {
+  // playlist entries found by search open directly in the playlist view
+  if (v.isPlaylist || v.type === 'playlist') {
+    const skel = skeleton(1);
+    let r = null;
+    try { r = await window.kaman.playlist(v.url, proxy); } catch (_) { }
+    skel.remove();
+    if (!r) { toast(T.errorSearch, 'err'); return; }
+    renderPlaylist(r);
+    return;
+  }
   const skel = skeleton(4);
   let r = null;
   try { r = await window.kaman.info(v.url, proxy); } catch (_) { /* try playlist */ }
@@ -217,9 +234,11 @@ function renderVideo(v) {
   const subs = v.subtitles || [];
   const subBtns = qs('#v-subs-btns');
   subBtns.className = 'sub-btns';
-  subBtns.innerHTML = (subs.length ? `<button class="sub-btn active" data-lang="">${T.none}</button>` : `<button class="sub-btn active" data-lang="">${T.none}</button>`) +
-    subs.map(s => `<button class="sub-btn" data-lang="${s.lang}">${s.name} (${s.lang})</button>`).join('');
+  const noneBtn = `<button class="sub-btn active" data-lang="">${T.none}</button>`;
+  subBtns.innerHTML = noneBtn +
+    subs.map(s => `<button class="sub-btn" data-lang="${s.lang}">${s.name}</button>`).join('');
   selectedSubLang = null;
+  qs('#v-thumbdl').checked = false;
   subBtns.querySelectorAll('.sub-btn').forEach(b => {
     b.onclick = () => {
       subBtns.querySelectorAll('.sub-btn').forEach(x => x.classList.remove('active'));
@@ -264,7 +283,7 @@ function enqueue(kind) {
       ? `${selectedQuality ? selectedQuality.split('+')[0].replace(/[^0-9]/g, '') + 'p' : 'Best'}`
       : '',
     subLang: kind === 'video' ? selectedSubLang : null,
-    thumbnail: true,                                   // always fetch; embed vs separate per settings
+    thumbnail: kind === 'video' ? qs('#v-thumbdl').checked : false,
     embedSubs: kind === 'video' ? !!sEmbedSubs : false,
     embedThumb: kind === 'video' ? !!sEmbedThumb : false,
     separateFiles: kind === 'video' ? !!sSeparate : false,

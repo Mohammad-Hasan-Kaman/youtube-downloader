@@ -79,16 +79,22 @@ class YtdlpService extends EventEmitter {
       .map((l) => {
         try { return JSON.parse(l); } catch (_) { return null; }
       })
-      .filter((o) => o && (o.type === 'video' || !o.type))
-      .map((o) => ({
-        id: o.id,
-        url: (o.url && o.url.startsWith('http')) ? o.url : `https://www.youtube.com/watch?v=${o.id}`,
-        title: o.title || '',
-        uploader: o.uploader || o.channel || '',
-        duration: o.duration || 0,
-        thumb: o.thumbnail || o.thumbnails?.[o.thumbnails?.length - 1]?.url || '',
-        views: o.view_count || 0,
-      }));
+      .filter((o) => o && (o.type === 'video' || o.type === 'playlist' || !o.type))
+      .map((o) => {
+        const isPlaylist = o.type === 'playlist';
+        return {
+          id: o.id,
+          url: (o.url && o.url.startsWith('http')) ? o.url : `https://www.youtube.com/watch?v=${o.id}`,
+          title: o.title || '',
+          uploader: o.uploader || o.channel || '',
+          duration: o.duration || 0,
+          thumb: o.thumbnail || o.thumbnails?.[o.thumbnails?.length - 1]?.url || '',
+          views: o.view_count || 0,
+          type: isPlaylist ? 'playlist' : 'video',
+          isPlaylist,
+          count: isPlaylist ? o.playlist_count || o.n_entries || 0 : 0,
+        };
+      });
   }
 
   /* ------------------------------------------------------ video info ---- */
