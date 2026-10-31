@@ -1,7 +1,7 @@
 // Robust GitHub release asset upload with retry, for slow connections.
+// Usage: node scripts/upload-asset.js <release_id> <file> <asset_name>
+'use strict';
 const fs = require('fs');
-const { execFileSync } = require('child_process');
-
 const [,, releaseId, file, name] = process.argv;
 const creds = fs.readFileSync(require('os').homedir() + '/.git-credentials', 'utf8');
 const m = creds.match(/https:\/\/Mohammad-Hasan-Kaman:([^@]+)@github\.com/);
