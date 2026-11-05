@@ -19,6 +19,7 @@
     "directories": {
       "output": "dist_out"
     },
+    "artifactName": "${productName}-Setup-${version}.${ext}",
     "files": [
       "main.js",
       "preload.js",
