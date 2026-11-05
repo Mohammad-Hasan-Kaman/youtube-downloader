@@ -74,7 +74,7 @@ async function main() {
   check('light bg differs from dark bg', bgLight !== bgDark, bgLight + ' vs ' + bgDark);
   await shot('v3-home-dark-fa.png');
 
-  // language: en (LTR) then de (LTR) then fa (RTL), live, no reload
+  // language: en (LTR), de (LTR), ar (RTL), zh (LTR), fa (RTL) - live, no reload
   await ev(`document.querySelector('[data-lang-pick="en"]').click()`);
   await sleep(600);
   check('en: dir=ltr', await ev('document.documentElement.dir==="ltr"'));
@@ -84,13 +84,39 @@ async function main() {
   await sleep(600);
   check('de: settings nav in German', await ev('[...document.querySelectorAll(".nav-btn span")].some(s=>s.textContent==="Einstellungen")'));
   await shot('v3-home-dark-de.png');
+  await ev(`document.querySelector('[data-lang-pick="ar"]').click()`);
+  await sleep(600);
+  check('ar: dir=rtl', await ev('document.documentElement.dir==="rtl"'));
+  check('ar: settings nav in Arabic', await ev('[...document.querySelectorAll(".nav-btn span")].some(s=>s.textContent==="الإعدادات")'));
+  await shot('v3-home-dark-ar.png');
+  await ev(`document.querySelector('[data-lang-pick="es"]').click()`);
+  await sleep(600);
+  check('es: dir=ltr + Spanish nav', await ev('document.documentElement.dir==="ltr" && [...document.querySelectorAll(".nav-btn span")].some(s=>s.textContent==="Ajustes")'));
+  await ev(`document.querySelector('[data-lang-pick="ru"]').click()`);
+  await sleep(600);
+  check('ru: Russian nav', await ev('[...document.querySelectorAll(".nav-btn span")].some(s=>s.textContent==="Настройки")'));
+  await ev(`document.querySelector('[data-lang-pick="zh"]').click()`);
+  await sleep(600);
+  check('zh: dir=ltr + Chinese nav', await ev('document.documentElement.dir==="ltr" && [...document.querySelectorAll(".nav-btn span")].some(s=>s.textContent==="设置")'));
+  await shot('v3-home-dark-zh.png');
   await ev(`document.querySelector('[data-lang-pick="fa"]').click()`);
   await sleep(600);
   check('fa: dir=rtl again', await ev('document.documentElement.dir==="rtl"'));
 
-  // settings page renders real version data
+  // home tiles show feature chips; explore grid exists on the search page
+  check('feature chips on home tiles', await ev('document.querySelectorAll("#platform-grid .chip").length>5'));
+  await ev(`document.querySelector('[data-page="search"]').click()`);
+  await sleep(200);
+  check('explore grid rendered', await ev('document.querySelectorAll("#explore-grid .platform-card").length===5'));
+
+  // settings: account + safety cards exist; blocked site is refused by main
   await ev(`document.querySelector('[data-page="settings"]').click()`);
   await sleep(400);
+  check('account mode select', await ev('!!document.querySelector("#s-account-mode")'));
+  check('adult block toggle', await ev('!!document.querySelector("#s-blockadult")'));
+  check('adult block default ON', await ev('document.querySelector("#s-blockadult").checked===true'));
+  const blocked = await ev(`window.kaman.info('https://www.pornhub.com/video/123','',null).then(()=>'NOT-BLOCKED').catch(e=>String(e&&e.message||e))`);
+  check('adult site blocked in main', /blocked-by-user-list/.test(String(blocked)), String(blocked).slice(0, 60));
   await shot('v3-settings-dark-fa.png');
   const ytdlp = await ev('document.querySelector("#v-ytdlp").textContent');
   console.log('info  yt-dlp version cell:', ytdlp);
