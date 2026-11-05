@@ -55,13 +55,16 @@ class YtdlpService extends EventEmitter {
     });
   }
 
-  _commonArgs(proxy, extra) {
+  _commonArgs(proxy, extra, opts) {
     return [
       '--no-warnings',
       '--no-playlist',
       '--skip-download',
       ...(extra || []),
       ...(proxy ? ['--proxy', proxy] : []),
+      // Optional, explicit user opt-in only: read the signed-in session from
+      // the user's own browser (e.g. Instagram). Never stored, never logged.
+      ...(opts && opts.cookiesBrowser ? ['--cookies-from-browser', String(opts.cookiesBrowser)] : []),
     ];
   }
 
@@ -99,8 +102,8 @@ class YtdlpService extends EventEmitter {
 
   /* ------------------------------------------------------ video info ---- */
 
-  async info(url, proxy) {
-    const args = this._commonArgs(proxy, ['--dump-single-json', url]);
+  async info(url, proxy, opts) {
+    const args = this._commonArgs(proxy, ['--dump-single-json', url], opts);
     const stdout = await this._exec(args, 90000);
     const o = JSON.parse(stdout);
     if (o._type === 'playlist' && o.entries) {
@@ -109,8 +112,8 @@ class YtdlpService extends EventEmitter {
     return this._videoShape(o);
   }
 
-  async playlist(url, proxy) {
-    const args = this._commonArgs(proxy, ['--dump-single-json', '--flat-playlist', url]);
+  async playlist(url, proxy, opts) {
+    const args = this._commonArgs(proxy, ['--dump-single-json', '--flat-playlist', url], opts);
     const stdout = await this._exec(args, 120000);
     const o = JSON.parse(stdout);
     return this._playlistShape(o);
@@ -208,17 +211,23 @@ class YtdlpService extends EventEmitter {
     if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
     const isAudio = job.kind === 'audio';
-    const embedSubs = job.embedSubs !== false;    // default: embedded into the video
-    const embedThumb = job.embedThumb !== false;  // default: embedded into the video
-    const separate = !!job.separateFiles;         // optional: keep extra files
+    // Subtitle / thumbnail placement modes: 'embedded' | 'separate' | 'disabled'.
+    // Legacy flags (embedSubs / embedThumb / separateFiles) still honoured.
+    const subsMode = job.subsMode
+      || (job.separateFiles ? 'separate' : (job.embedSubs === false ? 'disabled' : 'embedded'));
+    const thumbMode = job.thumbMode
+      || (job.separateFiles ? 'separate' : (job.embedThumb === false ? 'disabled' : 'embedded'));
     const args = [
       '--no-warnings',
       '--newline',
       '--no-playlist',
+      '--continue',
       '--merge-output-format', 'mp4',
       '-o', path.join(outDir, '%(title)s [%(id)s].%(ext)s'),
       ...(this.ffmpegDir() ? ['--ffmpeg-location', this.ffmpegDir()] : []),
       ...(proxy ? ['--proxy', proxy] : []),
+      ...(job.rateLimitKb && job.rateLimitKb > 0 ? ['--limit-rate', `${job.rateLimitKb}K`] : []),
+      ...(job.cookiesBrowser ? ['--cookies-from-browser', String(job.cookiesBrowser)] : []),
     ];
 
     if (isAudio) {
@@ -232,21 +241,19 @@ class YtdlpService extends EventEmitter {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best');
     }
 
-    // Subtitles: embed into the file by default; separate .srt only if requested.
-    if (job.subLang) {
-      if (separate) {
+    // Subtitles: embedded into the container, a separate .srt, or skipped.
+    if (job.subLang && subsMode !== 'disabled') {
+      if (subsMode === 'separate') {
         args.push('--write-sub', '--sub-langs', job.subLang, '--convert-subs', 'srt');
-      } else if (embedSubs) {
+      } else {
         args.push('--embed-subs', '--sub-langs', job.subLang, '--convert-subs', 'srt');
       }
     }
-    // Thumbnail: embed into the file by default; separate file only if requested.
-    if (job.thumbnail) {
-      if (separate) {
-        args.push('--write-thumbnail');
-      } else if (embedThumb) {
-        args.push('--embed-thumbnail');
-      }
+    // Thumbnail: embedded into the media file or saved next to it.
+    if (thumbMode === 'separate') {
+      args.push('--write-thumbnail');
+    } else if (thumbMode === 'embedded') {
+      args.push('--embed-thumbnail');
     }
     args.push(job.url);
 
@@ -282,11 +289,13 @@ class YtdlpService extends EventEmitter {
           const pct = parseFloat(m[1]);
           if (pct !== lastPct) {
             lastPct = pct;
+            // m[2] is the TOTAL size ("x% of ~SIZE"); downloaded derives from pct.
+            const totalKb = (parseFloat(m[2]) || 0) * units[m[3]];
             send({
               type: 'progress',
               pct,
-              downloaded: (parseFloat(m[2]) || 0) * units[m[3]],
-              total: pct > 0 ? (parseFloat(m[2]) || 0) * units[m[3]] / (pct / 100) : 0,
+              downloaded: totalKb * (pct / 100),
+              total: totalKb,
               speed: (parseFloat(m[4]) || 0) * units[m[5]],
               eta: m[6] ? `${m[6]}:${m[7]}` : '',
             });
@@ -311,6 +320,17 @@ class YtdlpService extends EventEmitter {
 
     return id;
   }
+
+  /** yt-dlp version string for Diagnostics / Settings, or null. */
+  version() {
+    return new Promise((resolve) => {
+      execFile(this.binPath(), ['--version'], { windowsHide: true, timeout: 15000 },
+        (err, stdout) => resolve(err ? null : String(stdout || '').trim() || null));
+    });
+  }
+
+  /** Whether the bundled ffmpeg is available (merge / embed steps). */
+  hasFfmpeg() { return !!this.ffmpegDir(); }
 
   cancel(id) {
     const c = this._jobs.get(id);

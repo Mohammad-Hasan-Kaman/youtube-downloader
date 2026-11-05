@@ -1,8 +1,8 @@
 {
   "name": "kamantube",
   "productName": "KamanTube",
-  "version": "2.2.0",
-  "description": "A modern YouTube downloader with automatic censorship bypass",
+  "version": "3.0.0",
+  "description": "KamanTube — Universal Media Downloader: YouTube, Pinterest, Instagram, TikTok and X with automatic smart routing",
   "main": "main.js",
   "author": " MohammadHasan Kaman",
   "homepage": "https://github.com/Mohammad-Hasan-Kaman/youtube-downloader",

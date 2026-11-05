@@ -15,11 +15,17 @@ contextBridge.exposeInMainWorld('kaman', {
 
   // yt-dlp
   search: (q, proxy) => ipcRenderer.invoke('yt:search', q, proxy),
-  info: (url, proxy) => ipcRenderer.invoke('yt:info', url, proxy),
-  playlist: (url, proxy) => ipcRenderer.invoke('yt:playlist', url, proxy),
+  info: (url, proxy, opts) => ipcRenderer.invoke('yt:info', url, proxy, opts),
+  playlist: (url, proxy, opts) => ipcRenderer.invoke('yt:playlist', url, proxy, opts),
   download: (job, proxy) => ipcRenderer.invoke('yt:download', job, proxy),
   cancel: (id) => ipcRenderer.invoke('yt:cancel', id),
   onYtEvent: (cb) => ipcRenderer.on('yt:event', (_e, e) => cb(e)),
+
+  // versions / library
+  versions: () => ipcRenderer.invoke('app:versions'),
+  libraryList: () => ipcRenderer.invoke('library:list'),
+  libraryDelete: (p) => ipcRenderer.invoke('library:delete', p),
+  showInFolder: (p) => ipcRenderer.invoke('shell:show', p),
 
   // paths
   getDownloads: () => ipcRenderer.invoke('paths:downloads'),

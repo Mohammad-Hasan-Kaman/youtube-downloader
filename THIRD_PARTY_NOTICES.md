@@ -36,10 +36,14 @@ is satisfied by this permanent link to the unmodified upstream repository.)
 
 ---
 
-## PattNG — patterniha/PattNG
+## PattN — patterniha/PattN
 - **License:** GNU General Public License v3.0 (GPL-3.0)
-- **Repository:** https://github.com/patterniha/PattNG
-- **Used for:** reference architecture for the tunnel fallback strategy.
+- **Repository:** https://github.com/patterniha/PattN
+- **Used for:** reference architecture only. PattN (a v2rayN fork for
+  Windows/Linux/macOS) integrates the Aether core to build WARP configs
+  on the desktop; KamanTube follows the same pattern by orchestrating
+  the Aether core binary directly. No PattN code is copied or bundled,
+  and PattN is not a runtime dependency.
 - **Modifications:** none.
 
 ### GNU GENERAL PUBLIC LICENSE v3.0
@@ -58,7 +62,7 @@ details.
 You should have received a copy of the GNU General Public License along with
 this program. If not, see <https://www.gnu.org/licenses/>.
 
-**Corresponding source:** https://github.com/patterniha/PattNG
+**Corresponding source:** https://github.com/patterniha/PattN
 
 ---
 

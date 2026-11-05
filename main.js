@@ -8,7 +8,7 @@ const { app, BrowserWindow, ipcMain, shell, dialog, nativeImage } = require('ele
 const path = require('path');
 const fs = require('fs');
 
-const TunnelManager = require('./src/tunnel');
+const { SmartRoutingManager } = require('./src/routing');
 const { YtdlpService } = require('./src/yt');
 const { getI18n } = require('./src/i18n');
 const state = require('./src/state');
@@ -37,7 +37,7 @@ app.whenReady().then(() => {
     : path.join(resourcesDir, 'vendor');
 
   yt = new YtdlpService(vendorDir);
-  tunnel = new TunnelManager(vendorDir);
+  tunnel = new SmartRoutingManager(vendorDir);
 
   tunnel.on('status', (s) => {
     if (win) win.webContents.send('tunnel:status', s);
@@ -145,18 +145,15 @@ function createWindow(isDev) {
 
 /* ------------------------------------------------------------------ IPC --- */
 
-// Language - user asked for a real full restart so every string flips RTL/LTR
+// Language - applied live by the renderer (strings + dir flip), no reload.
 ipcMain.handle('lang:get', () => ({
   language: state.get('language', 'fa'),
   strings: getI18n(state.get('language', 'fa')),
 }));
 ipcMain.handle('lang:set', (_e, lang) => {
   state.set('language', lang);
-  if (win) {
-    win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
-    // full reload -> complete RTL/LTR flip on every element
-    setTimeout(() => win.webContents.reload(), 120);
-  }
+  if (win) win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
+  return { language: lang, strings: getI18n(lang) };
 });
 
 // Settings
@@ -200,8 +197,8 @@ function withProxy(proxy) {
   return (tunnel && tunnel.usingTunnel) ? tunnel.proxyUrl() : '';
 }
 ipcMain.handle('yt:search', async (_e, q, proxy) => yt.search(q, withProxy(proxy)));
-ipcMain.handle('yt:info', async (_e, url, proxy) => yt.info(url, withProxy(proxy)));
-ipcMain.handle('yt:playlist', async (_e, url, proxy) => yt.playlist(url, withProxy(proxy)));
+ipcMain.handle('yt:info', async (_e, url, proxy, opts) => yt.info(url, withProxy(proxy), opts || null));
+ipcMain.handle('yt:playlist', async (_e, url, proxy, opts) => yt.playlist(url, withProxy(proxy), opts || null));
 ipcMain.handle('yt:download', async (_e, job, proxy) => yt.download(job, withProxy(proxy)));
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));
 
@@ -226,6 +223,67 @@ ipcMain.handle('paths:open', async (_e, p) => {
     if (fs.existsSync(dir)) { shell.openPath(dir); return true; }
   } catch (_) { /* ignore */ }
   return false;
+});
+
+// Versions / dependency health (Diagnostics + Settings)
+ipcMain.handle('app:versions', async () => {
+  const aetherExe = path.join(
+    process.env.KAMANTUBE_DEV ? path.join(__dirname, 'vendor') : path.join(process.resourcesPath || '', 'vendor'),
+    'aether', 'aether.exe');
+  return {
+    app: app.getVersion(),
+    electron: process.versions.electron,
+    ytDlp: yt ? await yt.version() : null,
+    ffmpeg: yt ? yt.hasFfmpeg() : false,
+    aether: fs.existsSync(aetherExe),
+  };
+});
+
+// Media library: real files inside the downloads folder (one level deep).
+const MEDIA_EXTS = {
+  video: ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v'],
+  audio: ['.mp3', '.m4a', '.opus', '.ogg', '.wav', '.flac'],
+  image: ['.jpg', '.jpeg', '.png', '.webp', '.gif'],
+};
+function mediaKind(ext) {
+  for (const [k, list] of Object.entries(MEDIA_EXTS)) if (list.includes(ext)) return k;
+  return null;
+}
+ipcMain.handle('library:list', async () => {
+  const dir = state.get('downloadDir') && fs.existsSync(state.get('downloadDir'))
+    ? state.get('downloadDir') : app.getPath('videos');
+  const out = [];
+  const walk = (d, depth) => {
+    let entries = [];
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of entries) {
+      const full = path.join(d, e.name);
+      if (e.isDirectory()) { if (depth < 1) walk(full, depth + 1); continue; }
+      if (e.name.endsWith('.part') || e.name.endsWith('.ytdl')) continue;
+      const kind = mediaKind(path.extname(e.name).toLowerCase());
+      if (!kind) continue;
+      try {
+        const st = fs.statSync(full);
+        out.push({ name: e.name, path: full, kind, size: st.size, mtime: st.mtimeMs });
+      } catch (_) { /* ignore */ }
+    }
+  };
+  walk(dir, 0);
+  out.sort((a, b) => b.mtime - a.mtime);
+  return { dir, files: out };
+});
+ipcMain.handle('library:delete', async (_e, p) => {
+  if (!p || typeof p !== 'string') return false;
+  const dir = state.get('downloadDir') || app.getPath('videos');
+  const resolved = path.resolve(p);
+  // only ever delete inside the downloads folder tree
+  if (!resolved.startsWith(path.resolve(dir))) return false;
+  try { fs.rmSync(resolved, { force: true }); return true; } catch (_) { return false; }
+});
+ipcMain.handle('shell:show', async (_e, p) => {
+  if (!p || typeof p !== 'string' || !fs.existsSync(p)) return false;
+  shell.showItemInFolder(p);
+  return true;
 });
 
 app.on('window-all-closed', () => {
