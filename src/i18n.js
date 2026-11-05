@@ -9,6 +9,9 @@
 
 const STRINGS = {
   fa: {
+    cookiesTitle: 'ورود به اینستاگرام (اختیاری)',
+    cookiesOff: 'استفاده نمی‌شود (فقط محتوای عمومی)',
+    cookiesNote: 'اگر محتوای اینستاگرام بدون ورود در دسترس نبود، برنامه می‌تواند نشست واردشده خودتان را از مرورگرتان بخواند. این گزینه پیش‌فرض خاموش است؛ هیچ کوکی‌ای ذخیره یا در گزارش‌ها ثبت نمی‌شود.',
     appName: 'KamanTube',
     tagline: 'دانلودر رسانه‌ای چندسکویی',
     groupMain: 'اصلی',
@@ -173,6 +176,9 @@ const STRINGS = {
     fromPlatform: 'پلتفرم',
   },
   en: {
+    cookiesTitle: 'Instagram sign-in (optional)',
+    cookiesOff: 'Not used (public content only)',
+    cookiesNote: 'If Instagram content is unavailable signed-out, the app can read your own signed-in session from your browser. Off by default; no cookie is ever stored or logged.',
     appName: 'KamanTube',
     tagline: 'Universal media downloader',
     groupMain: 'Main',
@@ -337,6 +343,9 @@ const STRINGS = {
     fromPlatform: 'Platform',
   },
   de: {
+    cookiesTitle: 'Instagram-Anmeldung (optional)',
+    cookiesOff: 'Nicht verwendet (nur öffentliche Inhalte)',
+    cookiesNote: 'Falls Instagram-Inhalte ohne Anmeldung nicht verfügbar sind, kann die App Ihre eigene Sitzung aus Ihrem Browser lesen. Standardmäßig aus; Cookies werden nie gespeichert oder protokolliert.',
     appName: 'KamanTube',
     tagline: 'Universeller Medien-Downloader',
     groupMain: 'Hauptbereich',

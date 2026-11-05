@@ -1,640 +1,920 @@
 'use strict';
 /**
- * KamanTube - renderer logic
- * Views: home (search grid), video (quality cards), playlist, queue, history.
+ * KamanTube v3 - renderer.
+ * Pages: home, search, new, playlists, queue, history, library,
+ * settings, diagnostics, about. All network work goes through the
+ * main process (window.kaman); this file owns UI state only.
+ * Queue updates are targeted DOM writes keyed by job id - the list
+ * is never rebuilt on a progress event (no flicker).
  */
 
-const qs = (s) => document.querySelector(s);
-const qsAll = (s) => [...document.querySelectorAll(s)];
+const qs = (s, r) => (r || document).querySelector(s);
+const qsAll = (s, r) => [...(r || document).querySelectorAll(s)];
+const K = window.kaman;
+const P = window.KamanProviders;
 
-let T = {};           // i18n strings
-let netState = {};    // tunnel status cache
-let proxy = '';       // active socks5 url ('' = direct)
-let currentVideo = null;
-let selectedQuality = null;
-let queueItems = [];
-let historyItems = [];
-let running = 0;      // concurrent downloads
-const MAX_CONCURRENT = 2;
-let currentPlaylist = null;
-let lastDir = '';
-let selectedSubLang = null;
-let sEmbedSubs = true;
-let sEmbedThumb = true;
-let sSeparate = false;
-
-/* ------------------------------------------------------------- helpers */
-
-const fmtDur = (sec) => {
-  if (!sec) return '';
-  sec = Math.round(sec);
-  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    : `${m}:${String(s).padStart(2, '0')}`;
+/* ------------------------------------------------------------ icons --- */
+const IC = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  playlist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><path d="m15 14 6 3.5-6 3.5z"/></svg>',
+  queue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m0 0 4-4m-4 4L8 9"/><path d="M4 17v3h16v-3"/></svg>',
+  history: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg>',
+  library: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.14-1.4l2-1.55-2-3.46-2.36.95A7 7 0 0 0 14.1 5.1L13.72 2.6h-3.44L9.9 5.1a7 7 0 0 0-2.4 1.44l-2.36-.95-2 3.46 2 1.55a7 7 0 0 0 0 2.8l-2 1.55 2 3.46 2.36-.95a7 7 0 0 0 2.4 1.44l.38 2.5h3.44l.38-2.5a7 7 0 0 0 2.4-1.44l2.36.95 2-3.46-2-1.55c.1-.45.14-.92.14-1.4z"/></svg>',
+  activity: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 5 12L17 12h4"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="4" width="4.5" height="16" rx="1"/><rect x="13.5" y="4" width="4.5" height="16" rx="1"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
+  dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4"/><path d="M4 20h16"/></svg>',
 };
-const fmtSize = (b) => {
-  if (!b) return '';
-  const units = ['KB', 'MB', 'GB'];
-  let v = b / 1024, i = 0;
-  while (v >= 1000 && i < units.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(1)} ${units[i]}`;
+function icon(name) { return IC[name] || ''; }
+qsAll('[data-ico]').forEach((el) => { el.innerHTML = icon(el.dataset.ico); });
+
+/* ------------------------------------------------------------ state --- */
+let T = {};
+let LANG = 'fa';
+let page = 'home';
+let proxy = '';
+let net = { state: 'checking', ip: null, country: null, usingTunnel: false, protocol: null };
+let downloadsDir = '';
+const cfg = {
+  theme: 'system', defaultQuality: 'best', concurrency: 2, rateLimitKb: 0,
+  subsMode: 'embedded', thumbMode: 'embedded', defaultSubLang: '', cookiesBrowser: '',
+};
+const PLATFORM_COLORS = { youtube: '#e62117', pinterest: '#c8232c', instagram: '#b83a7d', tiktok: '#3aa6a0', x: '#888', web: '#c8871a' };
+const NAV_KEYS = { home: 'navHome', search: 'navSearch', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
+
+const fmtBytes = (kb) => {
+  if (!kb || kb <= 0) return '';
+  const mb = kb / 1024;
+  return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(kb) + ' KB';
+};
+const fmtDur = (s) => {
+  if (!s) return '';
+  s = Math.round(s);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : String(m)) + ':' + String(ss).padStart(2, '0');
 };
 const fmtViews = (n) => {
   if (!n) return '';
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
-  return String(n);
+  try { return new Intl.NumberFormat(LANG === 'fa' ? 'fa-IR' : LANG, { notation: 'compact' }).format(n); }
+  catch (_) { return String(n); }
 };
-const toast = (msg, type = '') => {
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function toast(msg, isErr) {
+  const box = qs('#toasts');
   const el = document.createElement('div');
-  el.className = `toast ${type}`;
+  el.className = 'toast' + (isErr ? ' err' : '');
   el.textContent = msg;
-  qs('#toasts').appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .4s'; }, 2800);
-  setTimeout(() => el.remove(), 3300);
-};
-const esc = (s) => {
-  const d = document.createElement('div');
-  d.textContent = s || '';
-  return d.innerHTML;
-};
-const isVideoUrl = (t) =>
-  /^https?:\/\//.test(t) && /(youtube\.com|youtu\.be)/.test(t);
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 4200);
+}
 
-/* ---------------------------------------------------------------- i18n */
-
+/* -------------------------------------------------------- i18n -------- */
 function applyStrings() {
-  document.title = T.appName || 'KamanTube';
-  qsAll('[data-i18n]').forEach((el) => {
-    const k = el.getAttribute('data-i18n');
-    if (T[k]) el.textContent = T[k];
-  });
-  const lang = document.documentElement.getAttribute('lang') || 'fa';
-  qs('#search-input').placeholder = T.searchPlaceholder;
-}
-
-async function loadLang() {
-  const { language, strings } = await window.kaman.langGet();
-  T = strings;
-  applyLangMeta(language);
-  applyStrings();
-}
-
-function applyLangMeta(language) {
-  document.documentElement.lang = language;
-  document.documentElement.dir = language === 'fa' ? 'rtl' : 'ltr';
-  qsAll('.seg-b[data-lang]').forEach((b) => b.classList.toggle('active', b.dataset.lang === language));
+  document.documentElement.lang = LANG;
+  document.documentElement.dir = LANG === 'fa' ? 'rtl' : 'ltr';
+  qsAll('[data-i18n]').forEach((el) => { const v = T[el.dataset.i18n]; if (v) el.textContent = v; });
+  qsAll('[data-i18n-title]').forEach((el) => { const v = T[el.dataset.i18nTitle]; if (v) el.title = v; });
+  qs('#page-title').textContent = T[NAV_KEYS[page]] || '';
+  qs('#home-url').placeholder = T.pastePlaceholder || '';
+  qs('#new-url').placeholder = T.pastePlaceholder || '';
+  qs('#pl-url').placeholder = T.playlistPlaceholder || '';
   qs('#search-input').placeholder = T.searchPlaceholder || '';
+  qs('#lib-search').placeholder = T.librarySearchPlaceholder || '';
+  qsAll('#lang-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.langPick === LANG));
+  const sel = qs('#s-lang'); if (sel) sel.value = LANG;
+  renderPlatformGrid();
+  renderNetChip();
+  renderQueue();
+  renderHistory();
+  updateOverall();
 }
 
-/* ------------------------------------------------------------- network */
+/* -------------------------------------------------------- theme ------- */
+function effectiveTheme() {
+  if (cfg.theme === 'dark' || cfg.theme === 'light') return cfg.theme;
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+function applyTheme() {
+  document.documentElement.dataset.theme = effectiveTheme();
+  qsAll('#theme-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.themePick === cfg.theme));
+  const sel = qs('#s-theme'); if (sel) sel.value = cfg.theme;
+}
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => { if (cfg.theme === 'system') applyTheme(); });
+async function setTheme(v) {
+  cfg.theme = v;
+  applyTheme();
+  await K.themeSet(v);
+}
 
-function renderNet() {
+/* -------------------------------------------------------- router ------ */
+function go(p) {
+  page = p;
+  qsAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === p));
+  qsAll('[data-page-panel]').forEach((s) => s.classList.toggle('active', s.dataset.pagePanel === p));
+  qs('#page-title').textContent = T[NAV_KEYS[p]] || '';
+  qs('#pages').scrollTop = 0;
+  if (p === 'library') loadLibrary();
+  if (p === 'diagnostics') refreshDiagnostics();
+  if (p === 'home') renderHomeRecent();
+}
+qsAll('.nav-btn').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
+
+/* -------------------------------------------------------- network ----- */
+function routeLabel() {
+  if (net.state === 'tunnel') return T.routeTunnel;
+  if (net.state === 'direct') return T.routeDirect;
+  if (net.state === 'offline') return T.routeOffline;
+  return T.routeChecking;
+}
+function renderNetChip() {
   const dot = qs('#net-dot');
-  const ipEl = qs('#net-ip');
-  const stateEl = qs('#net-state');
-  if (!netState.state) return;
-  dot.className = `net-dot ${netState.state}`;
-  if (netState.state === 'offline') {
-    ipEl.textContent = T.offline;
-    stateEl.textContent = '';
-    qs('#net-chip').title = '';
-    return;
-  }
-  const ip = netState.ip || '—';
-  const cc = netState.country || '';
-  let label = T.direct;
-  if (netState.usingTunnel) {
-    label = netState.protocol || T.tunnel;
-  }
-  ipEl.textContent = ip;
-  stateEl.textContent = cc ? `${cc} · ${label}` : label;
-  qs('#net-chip').title = netState.exitIp && netState.usingTunnel
-    ? `exit: ${netState.exitIp} (${netState.exitCountry || '?'})` : '';
+  dot.className = 'net-dot ' + (net.state === 'tunnel' ? 'tunnel' : net.state === 'direct' ? 'direct' : net.state === 'offline' ? 'offline' : '');
+  qs('#net-ip').textContent = net.ip ? `${T.yourIp}: ${net.ip}${net.country ? ' · ' + net.country : ''}` : (T.checkingNet || '…');
+  qs('#net-state').textContent = routeLabel() + (net.protocol ? ' · ' + net.protocol : '');
+  qs('#d-ip').textContent = net.ip || T.unknown || '…';
+  qs('#d-country').textContent = net.country || T.unknown || '…';
+  qs('#d-route').textContent = routeLabel();
+  qs('#d-protocol').textContent = net.protocol || '—';
 }
-
-/* --------------------------------------------------------------- views */
-
-function show(view) {
-  qsAll('.view-pane').forEach((p) => p.classList.remove('active'));
-  qsAll('.nav-btn').forEach((b) => b.classList.remove('active'));
-  qs('#pane-' + view).classList.add('active');
-  qs(`.nav-btn[data-view="${view}"]`).classList.add('active');
-  if (view === 'home' && !qs('#grid-results').children.length) {
-    qs('#hero-box').hidden = false;      // empty home -> welcome hero again
-  }
-  if (view === 'queue') renderQueue();
-  if (view === 'history') renderHistory();
-}
-
-/* ---------------------------------------------------------------- home */
-
-async function doSearch() {
-  const q = qs('#search-input').value.trim();
-  if (!q) return;
-  qs('#home-empty').hidden = true;
-  qs('#hero-box').hidden = true;               // hide hero while searching
-  const grid = qs('#grid-results');
-  grid.innerHTML = '';
-
-  if (isVideoUrl(q)) {
-    const skel = skeleton(1);
-    let r;
-    try {
-      r = await window.kaman.info(q, proxy);
-    } catch (e) {
-      try { r = await window.kaman.playlist(q, proxy); } catch (_) { r = null; }
-    }
-    skel.remove();
-    if (!r) { qs('#home-empty').textContent = T.errorSearch; qs('#home-empty').hidden = false; qs('#hero-box').hidden = true; return; }
-    if (r.type === 'video') { renderVideo(r); return; }
-    renderPlaylist(r); return;
-  }
-
-  const skel = skeleton(8);
-  let items = [];
+K.onTunnelStatus((s) => {
+  net = { ...net, ...s };
+  proxy = s && s.usingTunnel && s.port ? `socks5h://127.0.0.1:${s.port}` : '';
+  renderNetChip();
+});
+const logLines = [];
+K.onTunnelLog((m) => {
+  logLines.push(String(m));
+  if (logLines.length > 120) logLines.splice(0, logLines.length - 120);
+  const pre = qs('#d-log');
+  if (pre && page === 'diagnostics') { pre.textContent = logLines.join('\n'); pre.scrollTop = pre.scrollHeight; }
+});
+async function refreshDiagnostics() {
   try {
-    items = await window.kaman.search(q, proxy);
-  } catch (e) { /* keep empty */ }
-  skel.remove();
-  if (!items.length) {
-    qs('#home-empty').textContent = T.notFound;
-    qs('#home-empty').hidden = false;
-    qs('#hero-box').hidden = true;
-    return;
-  }
-  grid.innerHTML = items.map(cardHtml).join('');
-  grid.querySelectorAll('.grid-item').forEach((el, i) => {
-    el.onclick = () => playResult(items[i]);
-  });
+    const s = await K.tunnelGet();
+    if (s) {
+      net = {
+        ...net, ip: s.ip, country: s.country, protocol: s.protocol,
+        usingTunnel: s.usingTunnel,
+        state: s.usingTunnel ? 'tunnel' : (s.active ? 'direct' : net.state),
+      };
+      renderNetChip();
+    }
+  } catch (_) { /* tunnel still starting */ }
+  const pre = qs('#d-log');
+  if (pre) pre.textContent = logLines.join('\n');
+}
+qs('#d-recheck').addEventListener('click', async () => {
+  const b = qs('#d-recheck');
+  b.disabled = true; b.textContent = T.rechecking || '…';
+  try { await K.tunnelRecheck(); } catch (_) { /* reported via status */ }
+  await refreshDiagnostics();
+  b.disabled = false; b.textContent = T.recheck || '';
+});
+
+/* ------------------------------------------------- download queue ----- */
+/**
+ * A job: { id, url, title, platform, thumb, kind, formatId, formatLabel,
+ * subLang, subsMode, thumbMode, outDir, playlistId,
+ * status, pct, downloadedKb, totalKb, speedKb, eta, error }
+ * status: queued | downloading | merging | paused | done | failed | canceled
+ */
+const jobs = new Map();
+let jobSeq = 0;
+const history = [];
+
+async function persistQueue() {
+  const snap = [...jobs.values()]
+    .filter((j) => ['queued', 'paused'].includes(j.status))
+    .map((j) => ({ ...j, status: j.status === 'queued' ? 'queued' : 'paused', pct: 0, speedKb: 0, eta: '' }));
+  try { await K.settingSet('queueV3', snap); } catch (_) { /* non-fatal */ }
+}
+async function persistHistory() {
+  try { await K.settingSet('historyV3', history.slice(0, 200)); } catch (_) { /* non-fatal */ }
 }
 
-function skeleton(n) {
-  const skel = document.createElement('div');
-  skel.id = 'home-skel';
-  skel.innerHTML = Array.from({ length: n }, () =>
-    `<div class="skel-card skel"><div class="sk-thumb"></div><div class="sk-line" style="width:80%"></div><div class="sk-line" style="width:55%"></div></div>`
-  ).join('');
-  qs('#pane-home').appendChild(skel);
-  return skel;
-}
-
-function cardHtml(v) {
-  const isPl = v.type === 'playlist' || v.isPlaylist;
-  return `
-    <div class="grid-item ${isPl ? 'is-playlist' : ''}">
-      <div class="gi-thumb">
-        ${v.thumb ? `<img src="${v.thumb}" loading="lazy" onerror="this.remove()">` : ''}
-        ${isPl ? '<div class="gi-pl-badge">▶ ' + (T.playlistBadge || 'Playlist') + '</div>' : ''}
-        ${!isPl ? `<div class="gi-dur">${fmtDur(v.duration)}</div>` : ''}
-      </div>
-      <div class="gi-body">
-        <div class="gi-title">${esc(v.title)}</div>
-        <div class="gi-channel">${esc(v.uploader)}</div>
-        <div class="gi-meta">${isPl ? (v.count ? v.count + ' ' + (T.items || 'items') : T.playlistBadge || 'Playlist') : (fmtViews(v.views) || '')}</div>
-      </div>
-    </div>`;
-}
-
-async function playResult(v) {
-  // playlist entries found by search open directly in the playlist view
-  if (v.isPlaylist || v.type === 'playlist') {
-    const skel = skeleton(1);
-    let r = null;
-    try { r = await window.kaman.playlist(v.url, proxy); } catch (_) { }
-    skel.remove();
-    if (!r) { toast(T.errorSearch, 'err'); return; }
-    renderPlaylist(r);
-    return;
-  }
-  const skel = skeleton(4);
-  let r = null;
-  try { r = await window.kaman.info(v.url, proxy); } catch (_) { /* try playlist */ }
-  if (!r) { try { r = await window.kaman.playlist(v.url, proxy); } catch (_) { } }
-  skel.remove();
-  if (!r) { toast(T.errorSearch, 'err'); return; }
-  if (r.type === 'video') renderVideo(r); else renderPlaylist(r);
-}
-
-/* --------------------------------------------------------------- video */
-
-function renderVideo(v) {
-  currentVideo = v;
-  selectedQuality = null;
-  qs('#v-thumb').src = v.thumb || '';
-  qs('#v-duration').textContent = fmtDur(v.duration);
-  qs('#v-title').textContent = v.title;
-  qs('#v-channel').textContent = v.uploader;
-  qs('#v-views').textContent = v.views ? `${T.viewsLabel}: ${fmtViews(v.views)}` : '';
-  qs('#v-date').textContent = v.uploadDate
-    ? `${v.uploadDate.slice(0, 4)}-${v.uploadDate.slice(4, 6)}-${v.uploadDate.slice(6, 8)}` : '';
-
-  // subtitle buttons
-  const subs = v.subtitles || [];
-  const subBtns = qs('#v-subs-btns');
-  subBtns.className = 'sub-btns';
-  const noneBtn = `<button class="sub-btn active" data-lang="">${T.none}</button>`;
-  subBtns.innerHTML = noneBtn +
-    subs.map(s => `<button class="sub-btn" data-lang="${s.lang}">${s.name}</button>`).join('');
-  selectedSubLang = null;
-  qs('#v-thumbdl').checked = false;
-  subBtns.querySelectorAll('.sub-btn').forEach(b => {
-    b.onclick = () => {
-      subBtns.querySelectorAll('.sub-btn').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      selectedSubLang = b.dataset.lang || null;
-    };
-  });
-
-  const grid = qs('#q-grid');
-  grid.innerHTML = (v.qualities || []).map((q, i) => `
-    <div class="q-card ${i === 0 ? 'sel' : ''}" data-fid="${q.formatId}">
-      ${i === 0 ? '<div class="q-badge">BEST</div>' : ''}
-      ${q.hdr ? '<div class="q-badge" style="inset-inline-start:6px;color:#fff">HDR</div>' : ''}
-      <div class="q-h">${q.height}p</div>
-      <div class="q-sub">${q.fps}fps ${q.size ? '· ' + fmtSize(q.size) : ''}</div>
-    </div>`).join('');
-  selectedQuality = v.qualities?.[0]?.formatId || null;
-  grid.querySelectorAll('.q-card').forEach((el) => {
-    el.onclick = () => {
-      grid.querySelectorAll('.q-card').forEach((x) => x.classList.remove('sel'));
-      el.classList.add('sel');
-      selectedQuality = el.dataset.fid;
-    };
-  });
-  qs('#q-hint').textContent = v.audio ? `${T.audio}: ${v.audio.abr}kbps · ${fmtSize(v.audio.size)}` : '';
-  qs('#btn-audio').disabled = !v.audio;
-  show('video');
-  qs('#view-body').scrollTop = 0;
-}
-
-function enqueue(kind) {
-  if (!currentVideo) return;
-  const url = currentVideo.url;
-  const title = currentVideo.title;
-  const job = {
-    id: 'u' + Date.now() + Math.random().toString(36).slice(2, 5),
-    url, title,
-    thumb: currentVideo.thumb || '',
-    kind,
-    formatId: kind === 'audio' ? null : selectedQuality,
-    qualityLabel: kind === 'video'
-      ? `${selectedQuality ? selectedQuality.split('+')[0].replace(/[^0-9]/g, '') + 'p' : 'Best'}`
-      : '',
-    subLang: kind === 'video' ? selectedSubLang : null,
-    thumbnail: kind === 'video' ? qs('#v-thumbdl').checked : false,
-    embedSubs: kind === 'video' ? !!sEmbedSubs : false,
-    embedThumb: kind === 'video' ? !!sEmbedThumb : false,
-    separateFiles: kind === 'video' ? !!sSeparate : false,
-    state: 'wait', pct: 0, speed: '', outDir: lastDir,
+function jobOptions() {
+  return {
+    subsMode: cfg.subsMode, thumbMode: cfg.thumbMode,
+    rateLimitKb: cfg.rateLimitKb || 0,
+    cookiesBrowser: cfg.cookiesBrowser || '',
   };
-  queueItems.unshift(job);
-  updateQueueBadge();
-  show('queue');
-  pumpQueue();
-  toast(T.toQueue, 'ok');
 }
 
-/* ------------------------------------------------------------ playlist */
-
-function renderPlaylist(pl) {
-  currentPlaylist = pl;
-  qs('#pl-thumb').src = pl.entries?.[0]?.thumb || '';
-  qs('#pl-title').textContent = pl.title || T.playlistItems;
-  qs('#pl-count').textContent = `${pl.entries?.length || 0} ${T.items}`;
-  qs('#pl-items').innerHTML = pl.entries.map((e) => `
-    <div class="pl-row">
-      <input type="checkbox" class="pl-check" data-id="${e.id}" checked />
-      <img src="${e.thumb}" loading="lazy" onerror="this.src=''">
-      <div class="pi-title">${esc(e.title)}</div>
-      <div class="pi-dur">${fmtDur(e.duration)}</div>
-    </div>`).join('');
-  show('playlist');
+function enqueue(input) {
+  const url = String(input.url || '').trim();
+  if (!url) return null;
+  const formatId = input.formatId || 'best';
+  for (const j of jobs.values()) {
+    if (j.url === url && j.formatId === formatId && ['queued', 'downloading', 'merging', 'paused'].includes(j.status)) {
+      toast(T.addedToQueue); // already there - do not duplicate
+      go('queue');
+      return j;
+    }
+  }
+  const job = {
+    id: 'j' + Date.now().toString(36) + (++jobSeq).toString(36),
+    url, title: input.title || url,
+    platform: input.platform || P.detect(url) || 'web',
+    thumb: input.thumb || '', kind: input.kind || 'video',
+    formatId, formatLabel: input.formatLabel || '',
+    subLang: input.subLang || '', outDir: downloadsDir,
+    playlistId: input.playlistId || null,
+    status: 'queued', pct: 0, downloadedKb: 0, totalKb: 0, speedKb: 0, eta: '', error: '',
+    ...jobOptions(),
+    ...(input.subsMode ? { subsMode: input.subsMode } : {}),
+    ...(input.thumbMode ? { thumbMode: input.thumbMode } : {}),
+  };
+  jobs.set(job.id, job);
+  renderQueueItem(job);
+  updateQueueChrome();
+  persistQueue();
+  pump();
+  return job;
 }
 
-function enqueuePlaylist() {
-  const checks = qsAll('#pl-items .pl-check');
-  const sel = currentPlaylist.entries.filter((e, i) => checks[i]?.checked);
-  sel.reverse().forEach((e) => {
-    queueItems.unshift({
-      id: 'u' + Date.now() + Math.random().toString(36).slice(2, 5),
-      url: e.url, title: e.title, thumb: e.thumb || '', kind: 'best',
-      formatId: 'best', qualityLabel: 'Best', state: 'wait', pct: 0, speed: '',
-      embedSubs: !!sEmbedSubs, embedThumb: !!sEmbedThumb, separateFiles: !!sSeparate,
-      outDir: lastDir + '\\' + (currentPlaylist.title || 'Playlist').replace(/[\\/:*?"<>|]/g, '_'),
-    });
+function activeCount() {
+  let n = 0;
+  for (const j of jobs.values()) if (j.status === 'downloading' || j.status === 'merging') n++;
+  return n;
+}
+
+async function pump() {
+  let n = activeCount();
+  for (const j of jobs.values()) {
+    if (n >= Math.max(1, cfg.concurrency || 2)) break;
+    if (j.status !== 'queued') continue;
+    j.status = 'downloading';
+    paintJob(j);
+    n++;
+    try {
+      const realId = await K.download({
+        id: j.id, url: j.url, title: j.title, kind: j.kind,
+        formatId: j.formatId === 'best' ? 'best' : j.formatId,
+        subLang: j.subLang || undefined,
+        subsMode: j.subsMode, thumbMode: j.thumbMode,
+        rateLimitKb: j.rateLimitKb || 0,
+        cookiesBrowser: j.platform === 'instagram' ? (j.cookiesBrowser || undefined) : undefined,
+        outDir: j.outDir || downloadsDir,
+      }, proxy);
+      if (realId && realId !== j.id) { /* engine honours our id */ }
+    } catch (e) {
+      j.status = 'failed';
+      j.error = String(e && e.message || e).slice(0, 240);
+      paintJob(j);
+      pushHistory(j);
+    }
+  }
+  updateQueueChrome();
+}
+
+function pushHistory(j) {
+  history.unshift({
+    title: j.title, url: j.url, platform: j.platform, thumb: j.thumb,
+    status: j.status, when: Date.now(), outDir: j.outDir || downloadsDir,
   });
-  updateQueueBadge();
-  show('queue');
-  pumpQueue();
-  toast(`${sel.length} ${T.toQueue}`, 'ok');
+  persistHistory();
+  renderHistory();
+  renderHomeRecent();
 }
 
-/* --------------------------------------------------------------- queue */
+K.onYtEvent((e) => {
+  const j = jobs.get(e.id);
+  if (!j) return;
+  if (e.type === 'progress') {
+    j.pct = e.pct; j.downloadedKb = e.downloaded || 0; j.totalKb = e.total || 0;
+    j.speedKb = e.speed || 0; j.eta = e.eta || '';
+    paintJobProgress(j);
+    updateOverall();
+    return;
+  }
+  if (e.type === 'merging') { j.status = 'merging'; paintJob(j); return; }
+  if (e.type === 'done') {
+    j.status = 'done'; j.pct = 100;
+    paintJob(j); pushHistory(j); toast(T.downloadDone);
+    persistQueue(); pump(); updateOverall();
+    return;
+  }
+  if (e.type === 'canceled') {
+    if (j.status !== 'paused') { j.status = 'canceled'; paintJob(j); }
+    persistQueue(); pump(); updateOverall();
+    return;
+  }
+  if (e.type === 'error') {
+    if (j.status === 'paused') return;
+    j.status = 'failed'; j.error = String(e.message || '').slice(0, 240);
+    paintJob(j); pushHistory(j); toast(T.downloadFailed, true);
+    persistQueue(); pump(); updateOverall();
+  }
+});
 
-function updateQueueBadge() {
-  const pending = queueItems.filter((j) => j.state !== 'done').length;
-  qs('#queue-badge').hidden = pending === 0;
-  qs('#queue-badge').textContent = pending;
+/* ---- queue DOM: build once per job, then targeted updates only ------ */
+function statusText(j) {
+  return {
+    queued: T.statusQueued, downloading: T.statusDownloading, merging: T.statusMerging,
+    paused: T.statusPaused, done: T.statusDone, failed: T.statusFailed, canceled: T.statusCanceled,
+  }[j.status] || j.status;
+}
+function jobEl(j) { return qs(`[data-job-id="${j.id}"]`); }
+
+function renderQueueItem(j) {
+  const list = qs('#queue-list');
+  const el = document.createElement('div');
+  el.className = 'row-item';
+  el.dataset.jobId = j.id;
+  el.innerHTML = `
+    ${j.thumb ? `<img class="row-thumb" src="${esc(j.thumb)}" alt="" loading="lazy">` : ''}
+    <div class="row-main">
+      <div class="row-title" title="${esc(j.title)}">${esc(j.title)}</div>
+      <div class="row-meta">
+        <span class="kind-badge">${esc(T[P.getProvider(j.platform).nameKey] || j.platform)}</span>
+        <span class="status" data-f="status"></span>
+        <span class="mono" data-f="pct"></span>
+        <span data-f="sizes"></span>
+        <span data-f="speed"></span>
+        <span data-f="eta"></span>
+      </div>
+      <div class="bar"><div class="bar-fill" data-f="fill"></div></div>
+      <div class="row-meta" data-f="err" style="color:var(--err)"></div>
+    </div>
+    <div class="row-actions" data-f="actions"></div>`;
+  list.appendChild(el);
+  paintJob(j);
+}
+
+function paintJob(j) {
+  const el = jobEl(j);
+  if (!el) { renderQueueItem(j); return; }
+  const st = qs('[data-f="status"]', el);
+  st.textContent = statusText(j);
+  st.className = 'status ' + j.status;
+  qs('[data-f="err"]', el).textContent = j.status === 'failed' && j.error ? j.error : '';
+  const act = qs('[data-f="actions"]', el);
+  act.innerHTML = '';
+  const mk = (ico, fn, title) => {
+    const b = document.createElement('button');
+    b.className = 'icon-btn'; b.innerHTML = icon(ico); if (title) b.title = title;
+    b.addEventListener('click', fn);
+    act.appendChild(b);
+  };
+  if (j.status === 'downloading' || j.status === 'merging') mk('pause', () => pauseJob(j), T.pause);
+  if (j.status === 'paused' || j.status === 'failed' || j.status === 'canceled') mk('play', () => resumeJob(j), j.status === 'failed' ? T.retry : T.resume);
+  if (['queued', 'downloading', 'merging', 'paused'].includes(j.status)) mk('x', () => cancelJob(j), T.cancel);
+  mk('folder', () => K.openFolder(j.outDir || downloadsDir), T.openFolder);
+  if (['done', 'failed', 'canceled'].includes(j.status)) mk('trash', () => removeJob(j), T.remove);
+  paintJobProgress(j);
+}
+
+function paintJobProgress(j) {
+  const el = jobEl(j);
+  if (!el) return;
+  qs('[data-f="fill"]', el).style.width = (j.pct || 0) + '%';
+  qs('[data-f="pct"]', el).textContent = j.status === 'downloading' || j.status === 'merging' ? Math.floor(j.pct || 0) + '%' : '';
+  qs('[data-f="sizes"]', el).textContent = j.totalKb ? `${fmtBytes(j.downloadedKb)} / ${fmtBytes(j.totalKb)}` : '';
+  qs('[data-f="speed"]', el).textContent = j.speedKb ? `${fmtBytes(j.speedKb)}/s` : '';
+  qs('[data-f="eta"]', el).textContent = j.eta ? `${T.eta}: ${j.eta}` : '';
+}
+
+async function pauseJob(j) {
+  j.status = 'paused'; // set BEFORE cancel so the canceled event keeps it paused
+  paintJob(j);
+  await K.cancel(j.id);
+  persistQueue(); pump(); updateOverall();
+}
+async function resumeJob(j) {
+  j.status = 'queued'; j.error = '';
+  paintJob(j); persistQueue(); pump();
+}
+async function cancelJob(j) {
+  const was = j.status;
+  j.status = 'canceled';
+  paintJob(j);
+  if (was === 'downloading' || was === 'merging') await K.cancel(j.id);
+  persistQueue(); pump(); updateOverall();
+}
+function removeJob(j) {
+  jobs.delete(j.id);
+  const el = jobEl(j); if (el) el.remove();
+  updateQueueChrome(); persistQueue(); updateOverall();
 }
 
 function renderQueue() {
-  const box = qs('#queue-items');
-  qs('#queue-empty').hidden = queueItems.length > 0;
-  box.innerHTML = queueItems.map((j) => `
-    <div class="queue-item" data-id="${j.id}">
-      <img src="${j.thumb || ''}" onerror="this.style.display='none'">
-      <div class="qi-mid">
-        <div class="qi-title">${esc(j.title)}</div>
-        <div class="qi-sub">${j.kind === 'audio' ? T.audio : j.kind === 'best' ? 'Best' : j.qualityLabel || ''}</div>
-        <div class="qi-bar"><div class="qi-fill" style="width:${j.pct || 0}%"></div></div>
-      </div>
-      <div class="qi-stat">
-        ${j.state === 'wait' ? `<span class="status-tag st-wait">${T.toQueue}</span>` : ''}
-        ${j.state === 'down' ? `<strong>${Math.round(j.pct || 0)}%</strong><br>${fmtSize(j.speed)}/s` : ''}
-        ${j.state === 'merge' ? `<span class="status-tag st-merge">${T.mergeProgress}</span>` : ''}
-        ${j.state === 'done' ? `<span class="status-tag st-done">${T.done}</span>` : ''}
-        ${j.state === 'error' ? `<span class="status-tag st-fail">${T.failed}</span>` : ''}
-        ${j.state === 'canceled' ? `<span class="status-tag st-wait">${T.canceled}</span>` : ''}
-      </div>
-      ${j.state === 'error' ? `<button class="mini-btn" data-retry="${j.id}">${T.retry}</button>` : ''}
-      ${(j.state === 'wait' || j.state === 'down' || j.state === 'merge') ? `<button class="cancel-x" data-cancel="${j.id}">✕</button>` : ''}
-    </div>`).join('');
-  box.querySelectorAll('[data-cancel]').forEach((b) => {
-    b.onclick = () => {
-      const id = b.dataset.cancel;
-      const job = queueItems.find((j) => j.id === id);
-      if (job && job.state === 'down') window.kaman.cancel(id);
-      if (job && ['wait', 'merge'].includes(job.state)) { job.state = 'canceled'; pumpQueue(); }
-      renderQueue();
-    };
-  });
-  box.querySelectorAll('[data-retry]').forEach((b) => {
-    b.onclick = () => {
-      const job = queueItems.find((j) => j.id === b.dataset.retry);
-      if (job) { job.state = 'wait'; job.pct = 0; job.speed = 0; pumpQueue(); renderQueue(); }
-    };
-  });
+  const list = qs('#queue-list');
+  list.innerHTML = '';
+  for (const j of jobs.values()) renderQueueItem(j);
+  updateQueueChrome();
 }
-
-async function pumpQueue() {
-  while (running < MAX_CONCURRENT) {
-    const job = queueItems.find((j) => j.state === 'wait');
-    if (!job) break;
-    startDownload(job);
-  }
+function updateQueueChrome() {
+  const open = [...jobs.values()].filter((j) => ['queued', 'downloading', 'merging', 'paused'].includes(j.status)).length;
+  const badge = qs('#queue-badge');
+  badge.hidden = open === 0;
+  badge.textContent = String(open);
+  qs('#queue-empty').style.display = jobs.size === 0 ? '' : 'none';
+  updateOverall();
 }
-
-async function startDownload(job) {
-  job.state = 'down';
-  running++;
-  updateQueueBadge();
-  if (qs('#pane-queue').classList.contains('active')) renderQueue();
-  try {
-    await window.kaman.download(job, proxy);
-  } catch (e) {
-    job.state = 'error';
-    running--;
-    updateQueueBadge();
-    renderQueue();
-  }
+function updateOverall() {
+  const act = [...jobs.values()].filter((j) => ['downloading', 'merging', 'queued', 'done'].includes(j.status));
+  const wrap = qs('#queue-overall');
+  if (!act.length) { wrap.hidden = true; return; }
+  wrap.hidden = false;
+  const pct = act.reduce((a, j) => a + (j.status === 'done' ? 100 : j.pct || 0), 0) / act.length;
+  qs('#queue-overall-fill').style.width = pct + '%';
+  qs('#queue-overall-pct').textContent = Math.floor(pct) + '%';
 }
-
-/** In-place update of one queue row (no full rebuild -> no flicker). */
-function updateQueueRow(job) {
-  const row = document.querySelector(`.queue-item[data-id="${job.id}"]`);
-  if (!row) return;
-  const fill = row.querySelector('.qi-fill');
-  const stat = row.querySelector('.qi-stat');
-  if (fill) fill.style.width = `${job.pct || 0}%`;
-  if (stat) {
-    if (job.state === 'down') {
-      stat.innerHTML = `<strong>${Math.round(job.pct || 0)}%</strong><br>${fmtSize(job.speed)}/s`;
-    } else if (job.state === 'merge') {
-      stat.innerHTML = `<span class="status-tag st-merge">${T.mergeProgress}</span>`;
-    } else if (job.state === 'done') {
-      stat.innerHTML = `<span class="status-tag st-done">${T.done}</span>`;
-    } else if (job.state === 'error') {
-      stat.innerHTML = `<span class="status-tag st-fail">${T.failed}</span>`;
-    } else if (job.state === 'canceled') {
-      stat.innerHTML = `<span class="status-tag st-wait">${T.canceled}</span>`;
-    } else {
-      stat.innerHTML = `<span class="status-tag st-wait">${T.toQueue}</span>`;
+qs('#queue-clear').addEventListener('click', () => {
+  for (const j of [...jobs.values()]) {
+    if (['done', 'failed', 'canceled'].includes(j.status)) {
+      jobs.delete(j.id);
+      const el = jobEl(j); if (el) el.remove();
     }
   }
-  if (job.state === 'error' || job.state === 'done' || job.state === 'canceled') {
-    const btn = row.querySelector('.cancel-x');
-    if (btn) btn.remove();
-  }
+  updateQueueChrome(); persistQueue();
+});
+
+/* ------------------------------------------------------- history ------ */
+function historyRow(h) {
+  const el = document.createElement('div');
+  el.className = 'row-item';
+  el.innerHTML = `
+    ${h.thumb ? `<img class="row-thumb" src="${esc(h.thumb)}" alt="" loading="lazy">` : ''}
+    <div class="row-main">
+      <div class="row-title" title="${esc(h.title)}">${esc(h.title)}</div>
+      <div class="row-meta">
+        <span class="kind-badge">${esc(T[P.getProvider(h.platform || 'web').nameKey] || '')}</span>
+        <span class="status ${h.status === 'done' ? 'done' : 'failed'}">${h.status === 'done' ? (T.statusDone || '') : (T.statusFailed || '')}</span>
+        <span>${esc(new Date(h.when).toLocaleString(LANG === 'fa' ? 'fa-IR' : LANG))}</span>
+      </div>
+    </div>
+    <div class="row-actions"></div>`;
+  const act = qs('.row-actions', el);
+  const b = document.createElement('button');
+  b.className = 'icon-btn'; b.innerHTML = icon('folder'); b.title = T.openFolder || '';
+  b.addEventListener('click', () => K.openFolder(h.outDir || downloadsDir));
+  act.appendChild(b);
+  return el;
 }
-
-const applyYtEvent = (e) => {
-  const job = queueItems.find((j) => j.id === e.id);
-  if (!job) return;
-  if (e.type === 'progress') {
-    job.state = 'down';
-    job.pct = e.pct || 0;
-    job.speed = e.speed || 0;
-    // throttled in-place update — no rebuild
-    scheduleUiRefresh(job, 250);
-  } else if (e.type === 'merging') {
-    job.state = 'merge';
-    renderQueue();
-  } else if (e.type === 'done') {
-    job.state = 'done'; running--;
-    historyItems.unshift({ title: job.title, url: job.url, when: Date.now(), thumb: job.thumb, outDir: job.outDir });
-    localStorage.setItem('kt_history', JSON.stringify(historyItems.slice(0, 60)));
-    toast(T.toHistory, 'ok');
-    updateQueueBadge();
-    renderQueue();
-    pumpQueue();
-  } else if (e.type === 'error') {
-    job.state = 'error'; running--;
-    toast(`${T.failed}: ${e.message || ''}`, 'err');
-    updateQueueBadge();
-    renderQueue();
-    pumpQueue();
-  } else if (e.type === 'canceled') {
-    job.state = 'canceled'; running--;
-    updateQueueBadge();
-    renderQueue();
-    pumpQueue();
-  }
-  updateQueueBadge();
-};
-
-let uiTimer = null;
-let uiJob = null;
-const scheduleUiRefresh = (job, delay) => {
-  if (uiTimer && uiJob === job) return;
-  if (uiTimer) clearTimeout(uiTimer);
-  uiTimer = setTimeout(() => {
-    uiTimer = null;
-    if (job) updateQueueRow(job);
-    else if (qs('#pane-queue').classList.contains('active')) renderQueue();
-  }, delay || 800);
-};
-
-/* ------------------------------------------------------------- history */
-
 function renderHistory() {
-  const box = qs('#history-items');
-  const items = historyItems.slice(0, 60);
-  qs('#history-empty').hidden = items.length > 0;
-  box.innerHTML = items.map((h) => `
-    <div class="queue-item">
-      ${h.thumb ? `<img src="${h.thumb}" onerror="this.style.display='none'">` : ''}
-      <div class="qi-mid">
-        <div class="qi-title">${esc(h.title)}</div>
-        <div class="qi-sub">${new Date(h.when).toLocaleString()}</div>
+  const list = qs('#history-list');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const h of history) list.appendChild(historyRow(h));
+  qs('#history-empty').style.display = history.length ? 'none' : '';
+}
+function renderHomeRecent() {
+  const wrap = qs('#home-recent-wrap');
+  const list = qs('#home-recent');
+  if (!wrap || !list) return;
+  wrap.hidden = history.length === 0;
+  list.innerHTML = '';
+  for (const h of history.slice(0, 5)) list.appendChild(historyRow(h));
+}
+qs('#history-clear').addEventListener('click', () => {
+  history.length = 0;
+  persistHistory(); renderHistory(); renderHomeRecent();
+});
+
+/* ------------------------------------------------------- preview ------ */
+/**
+ * Renders fetched media info into `mount`.
+ * info.type 'video'    -> quality picker + subtitle & placement options
+ * info.type 'playlist' -> entry checklist with per-item progress via queue
+ */
+function mountPreview(mount, info, sourceUrl) {
+  mount.innerHTML = '';
+  if (info.type === 'playlist') { mountPlaylist(mount, info, sourceUrl); return; }
+  const platform = P.detect(sourceUrl) || 'web';
+  const wrap = document.createElement('div');
+  wrap.className = 'preview card';
+  const subOpts = ['<option value="">' + esc(T.subtitleNone) + '</option>']
+    .concat((info.subtitles || []).map((s) => `<option value="${esc(s.lang)}">${esc(s.name)} (${esc(s.lang)})</option>`)).join('');
+  wrap.innerHTML = `
+    <div class="preview-media">${info.thumb ? `<img src="${esc(info.thumb)}" alt="">` : ''}</div>
+    <div class="preview-main">
+      <h3 class="preview-title">${esc(info.title)}</h3>
+      <div class="preview-meta">
+        <span class="kind-badge">${esc(T[P.getProvider(platform).nameKey] || platform)}</span>
+        ${info.uploader ? `<span>${esc(T.channel)}: ${esc(info.uploader)}</span>` : ''}
+        ${info.duration ? `<span>${esc(T.duration)}: ${fmtDur(info.duration)}</span>` : ''}
+        ${info.views ? `<span>${esc(T.views)}: ${fmtViews(info.views)}</span>` : ''}
       </div>
-      <div class="grow"></div>
-      <div class="qi-stat">
-        <button class="mini-btn" data-open="${esc(h.url)}">${T.copyUrl}</button>
-        ${h.outDir ? `<button class="mini-btn" data-folder="${esc(h.outDir)}">${T.openFolder}</button>` : ''}
+      <div class="opt-label">${esc(T.quality)}</div>
+      <div class="q-list" data-role="qualities"></div>
+      <div class="opt-row">
+        <label class="opt-field"><span>${esc(T.subtitles)}</span>
+          <select data-role="sublang">${subOpts}</select></label>
+        <label class="opt-field"><span>${esc(T.subsMode)}</span>
+          <select data-role="subsmode">
+            <option value="embedded">${esc(T.modeEmbedded)}</option>
+            <option value="separate">${esc(T.modeSeparate)}</option>
+            <option value="disabled">${esc(T.modeDisabled)}</option>
+          </select></label>
+        <label class="opt-field"><span>${esc(T.thumbMode)}</span>
+          <select data-role="thumbmode">
+            <option value="embedded">${esc(T.modeEmbedded)}</option>
+            <option value="separate">${esc(T.modeSeparate)}</option>
+            <option value="disabled">${esc(T.modeDisabled)}</option>
+          </select></label>
       </div>
-    </div>`).join('');
-  box.querySelectorAll('[data-open]').forEach((b) => {
-    b.onclick = () => navigator.clipboard.writeText(b.dataset.open) && toast(T.copyUrl, 'ok');
+      <div class="preview-actions">
+        <button class="btn btn-primary" data-role="download">${icon('dl')}<span>${esc(T.download)}</span></button>
+        <button class="btn" data-role="audio">${esc(T.audioOnly)}</button>
+      </div>
+    </div>`;
+  mount.appendChild(wrap);
+
+  // quality options: best + audio are always real; heights come from the extractor
+  const qList = qs('[data-role="qualities"]', wrap);
+  let chosen = { formatId: 'best', label: T.qualityBest };
+  const mkQ = (formatId, label, size) => {
+    const b = document.createElement('button');
+    b.className = 'q-opt' + (formatId === chosen.formatId ? ' selected' : '');
+    b.innerHTML = `${esc(label)}${size ? `<small>${esc(fmtBytes(size / 1024))}</small>` : ''}`;
+    b.addEventListener('click', () => {
+      chosen = { formatId, label };
+      qsAll('.q-opt', qList).forEach((x) => x.classList.remove('selected'));
+      b.classList.add('selected');
+    });
+    qList.appendChild(b);
+  };
+  mkQ('best', T.qualityBest, 0);
+  const quals = (info.qualities || []).slice();
+  if (cfg.defaultQuality !== 'best') {
+    const want = Number(cfg.defaultQuality);
+    const near = quals.filter((q) => q.height <= want).sort((a, b) => b.height - a.height)[0] || quals[0];
+    if (near) chosen = { formatId: near.formatId, label: near.height + 'p' };
+  }
+  for (const q of quals) mkQ(q.formatId, q.height + 'p' + (q.fps > 30 ? ' ' + q.fps : '') + (q.hdr ? ' HDR' : ''), q.size);
+  qsAll('.q-opt', qList).forEach((x) => x.classList.toggle('selected', x.textContent.startsWith(chosen.label)));
+
+  qs('[data-role="subsmode"]', wrap).value = cfg.subsMode;
+  qs('[data-role="thumbmode"]', wrap).value = cfg.thumbMode;
+  const subSel = qs('[data-role="sublang"]', wrap);
+  if (cfg.defaultSubLang) {
+    const has = [...subSel.options].some((o) => o.value === cfg.defaultSubLang);
+    if (has) subSel.value = cfg.defaultSubLang;
+  }
+  const base = () => ({
+    url: info.url || sourceUrl, title: info.title, platform,
+    thumb: info.thumb, subLang: subSel.value || '',
+    subsMode: qs('[data-role="subsmode"]', wrap).value,
+    thumbMode: qs('[data-role="thumbmode"]', wrap).value,
   });
-  box.querySelectorAll('[data-folder]').forEach((b) => {
-    b.onclick = () => window.kaman.openFolder(b.dataset.folder);
+  qs('[data-role="download"]', wrap).addEventListener('click', () => {
+    enqueue({ ...base(), kind: 'video', formatId: chosen.formatId, formatLabel: chosen.label });
+    toast(T.addedToQueue);
+    go('queue');
+  });
+  qs('[data-role="audio"]', wrap).addEventListener('click', () => {
+    enqueue({ ...base(), kind: 'audio', formatId: 'audio', formatLabel: T.audioOnly });
+    toast(T.addedToQueue);
+    go('queue');
   });
 }
 
-/* ---------------------------------------------------------------- init */
-
-async function init() {
-  await loadLang();
-
-  historyItems = (() => {
-    try { return JSON.parse(localStorage.getItem('kt_history') || '[]'); } catch (_) { return []; }
-  })();
-
-  lastDir = await window.kaman.getDownloads();
-  qs('#dir-path').textContent = lastDir;
-  qs('#dir-path').title = lastDir;
-
-  netState = await window.kaman.tunnelGet();
-  proxy = netState.usingTunnel ? `socks5h://127.0.0.1:${netState.port || 1819}` : '';
-  renderNet();
-  // welcome screen: no results yet -> nothing under the hero
-  qs('#home-empty').hidden = true;
-
-  window.kaman.onTunnelStatus((s) => {
-    netState = s;
-    renderNet();
-    proxy = s.usingTunnel ? `socks5h://127.0.0.1:${s.port || 1819}` : '';
-  });
-
-  window.kaman.onYtEvent(applyYtEvent);
-
-  // Full language switch: swap every string and re-render dynamic panes.
-  window.kaman.onLang((payload) => {
-    T = payload.strings || payload;           // main sends {language, strings}
-    const lang = payload.language || 'fa';
-    applyLangMeta(lang);
-    applyStrings();
-    // refresh strings that live inside dynamically-built content
-    if (currentVideo) {
-      const subBtns = qs('#v-subs-btns');
-      if (subBtns) subBtns.querySelector('.sub-btn[data-lang=""]').textContent = T.none;
-      qs('#q-hint').textContent = currentVideo.audio
-        ? `${T.audio}: ${currentVideo.audio.abr}kbps · ${fmtSize(currentVideo.audio.size)}` : '';
+function mountPlaylist(mount, info, sourceUrl) {
+  const platform = P.detect(sourceUrl) || 'web';
+  const pid = 'pl' + Date.now().toString(36);
+  const wrap = document.createElement('div');
+  const firstThumb = (info.entries && info.entries[0] && info.entries[0].thumb) || '';
+  wrap.innerHTML = `
+    <div class="pl-head card">
+      ${firstThumb ? `<img src="${esc(firstThumb)}" alt="">` : ''}
+      <div>
+        <div class="pl-head-title">${esc(info.title || T.playlistBadge)}</div>
+        <div class="preview-meta"><span class="kind-badge">${esc(T[P.getProvider(platform).nameKey] || platform)}</span>
+        <span>${(info.entries || []).length} ${esc(T.items)}</span></div>
+      </div>
+    </div>
+    <div class="pl-toolbar">
+      <button class="btn btn-small" data-role="all">${esc(T.selectAll)}</button>
+      <button class="btn btn-small" data-role="none">${esc(T.deselectAll)}</button>
+      <span class="grow"></span>
+      <button class="btn btn-primary" data-role="go">${esc(T.downloadSelected)}</button>
+    </div>
+    <div class="list" data-role="entries"></div>`;
+  mount.appendChild(wrap);
+  const list = qs('[data-role="entries"]', wrap);
+  for (const e of info.entries || []) {
+    const row = document.createElement('label');
+    row.className = 'row-item check-line';
+    row.innerHTML = `
+      <input type="checkbox" checked data-url="${esc(e.url)}" data-title="${esc(e.title)}" data-thumb="${esc(e.thumb || '')}">
+      ${e.thumb ? `<img class="row-thumb" src="${esc(e.thumb)}" alt="" loading="lazy">` : ''}
+      <span class="row-main">
+        <span class="row-title">${esc(e.title)}</span>
+        <span class="row-meta">${e.uploader ? `<span>${esc(e.uploader)}</span>` : ''}${e.duration ? `<span>${fmtDur(e.duration)}</span>` : ''}</span>
+      </span>`;
+    list.appendChild(row);
+  }
+  const boxes = () => qsAll('input[type="checkbox"]', list);
+  qs('[data-role="all"]', wrap).addEventListener('click', () => boxes().forEach((b) => { b.checked = true; }));
+  qs('[data-role="none"]', wrap).addEventListener('click', () => boxes().forEach((b) => { b.checked = false; }));
+  qs('[data-role="go"]', wrap).addEventListener('click', () => {
+    let n = 0;
+    for (const b of boxes()) {
+      if (!b.checked) continue;
+      enqueue({
+        url: b.dataset.url, title: b.dataset.title, thumb: b.dataset.thumb,
+        platform, kind: 'video', formatId: 'best', formatLabel: T.qualityBest, playlistId: pid,
+      });
+      n++;
     }
-    if (qs('#pane-queue').classList.contains('active')) renderQueue();
-    if (qs('#pane-history').classList.contains('active')) renderHistory();
-    renderNet();
+    if (n) { toast(T.addedToQueue); go('queue'); }
   });
-
-  // nav
-  qsAll('.nav-btn[data-view]').forEach((b) => b.onclick = () => show(b.dataset.view));
-  qsAll('.back-btn').forEach((b) => b.onclick = () => show(b.dataset.back));
-
-  // search
-  qs('#btn-search').onclick = doSearch;
-  qs('#search-input').addEventListener('keydown', (e) => e.key === 'Enter' && doSearch());
-
-  // video actions
-  qs('#btn-addq').onclick = () => enqueue('video');
-  qs('#btn-audio').onclick = () => enqueue('audio');
-
-  // playlist
-  qs('#btn-pl-all').onclick = enqueuePlaylist;
-
-  // queue management
-  qs('#btn-clear-q').onclick = () => {
-    queueItems = queueItems.filter((j) => j.state === 'down' || j.state === 'merge');
-    updateQueueBadge();
-    renderQueue();
-  };
-
-  // settings
-  qs('#btn-dir').onclick = async () => {
-    const d = await window.kaman.pickDir();
-    if (d) { lastDir = d; qs('#dir-path').textContent = d; }
-  };
-
-  qs('#btn-open-folder').onclick = async () => {
-    await window.kaman.openFolder(lastDir);
-  };
-
-  // theme
-  qsAll('[data-theme]').forEach((b) => {
-    b.onclick = async () => {
-      const theme = b.dataset.theme;
-      document.documentElement.dataset.theme = theme;
-      await window.kaman.themeSet(theme);
-      qsAll('[data-theme]').forEach(x => x.classList.toggle('active', x.dataset.theme === theme));
-    };
-  });
-
-  // tunnel mode
-  const tunnelModeSel = qs('#s-tunnel-mode');
-  if (tunnelModeSel) {
-    tunnelModeSel.onchange = async () => {
-      await window.kaman.tunnelModeSet(tunnelModeSel.value);
-    };
-  }
-
-  // reset config
-  qs('#btn-reset-config').onclick = async () => {
-    if (confirm(T.confirmReset || 'Reset all settings?')) {
-      await window.kaman.resetConfig();
-      location.reload();
-    }
-  };
-
-  // language
-  qsAll('.seg-b[data-lang]').forEach((b) => b.onclick = async () => {
-    await window.kaman.langSet(b.dataset.lang);
-  });
-
-  // load saved settings
-  const savedTheme = await window.kaman.themeGet();
-  if (savedTheme) {
-    document.documentElement.dataset.theme = savedTheme;
-    qsAll('[data-theme]').forEach(x => x.classList.toggle('active', x.dataset.theme === savedTheme));
-  }
-  const savedTunnelMode = await window.kaman.tunnelModeGet();
-  if (savedTunnelMode && tunnelModeSel) {
-    tunnelModeSel.value = savedTunnelMode;
-  }
-  const savedEmbedSubs = await window.kaman.settingGet('embedSubs');
-  if (savedEmbedSubs !== null) { sEmbedSubs = !!savedEmbedSubs; qs('#s-embed-subs').checked = sEmbedSubs; }
-  const savedEmbedThumb = await window.kaman.settingGet('embedThumb');
-  if (savedEmbedThumb !== null) { sEmbedThumb = !!savedEmbedThumb; qs('#s-embed-thumb').checked = sEmbedThumb; }
-  const savedSeparateFiles = await window.kaman.settingGet('separateFiles');
-  if (savedSeparateFiles !== null) { sSeparate = !!savedSeparateFiles; qs('#s-separate-files').checked = sSeparate; }
-
-  // watch for settings changes to save
-  qs('#s-embed-subs').onchange = () => { sEmbedSubs = qs('#s-embed-subs').checked; window.kaman.settingSet('embedSubs', sEmbedSubs); };
-  qs('#s-embed-thumb').onchange = () => { sEmbedThumb = qs('#s-embed-thumb').checked; window.kaman.settingSet('embedThumb', sEmbedThumb); };
-  qs('#s-separate-files').onchange = () => { sSeparate = qs('#s-separate-files').checked; window.kaman.settingSet('separateFiles', sSeparate); };
-
-  // focus search
-  qs('#search-input').focus();
 }
 
-document.addEventListener('DOMContentLoaded', init);
+/* ---------------------------------------------------------- home ------ */
+function renderPlatformGrid() {
+  const grid = qs('#platform-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const p of [...P.PROVIDERS, P.FALLBACK]) {
+    const b = document.createElement('button');
+    b.className = 'platform-card';
+    b.innerHTML = `
+      <span class="platform-dot" style="background:${PLATFORM_COLORS[p.id] || '#888'}"></span>
+      <span><span class="platform-name">${esc(T[p.nameKey] || p.id)}</span>
+      <span class="platform-note" style="display:block">${esc(T[p.noteKey] || '')}</span></span>`;
+    b.addEventListener('click', () => {
+      if (p.id === 'youtube') { go('search'); qs('#search-input').focus(); }
+      else { go('new'); qs('#new-url').focus(); }
+    });
+    grid.appendChild(b);
+  }
+}
+function wirePaste(inputSel, tagSel) {
+  const input = qs(inputSel), tag = qs(tagSel);
+  if (!input) return;
+  input.addEventListener('input', () => {
+    const id = P.detect(input.value.trim());
+    if (id) { tag.hidden = false; tag.textContent = T[P.getProvider(id).nameKey] || id; }
+    else tag.hidden = true;
+  });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.dispatchEvent(new CustomEvent('kt-fetch')); });
+}
+wirePaste('#home-url', '#home-platform');
+wirePaste('#new-url', '#new-platform');
+qs('#home-fetch').addEventListener('click', () => startFetch(qs('#home-url').value));
+qs('#home-url').addEventListener('kt-fetch', () => startFetch(qs('#home-url').value));
+qs('#new-fetch').addEventListener('click', () => startFetch(qs('#new-url').value));
+qs('#new-url').addEventListener('kt-fetch', () => startFetch(qs('#new-url').value));
+
+async function startFetch(raw) {
+  const url = String(raw || '').trim();
+  go('new');
+  qs('#new-url').value = url;
+  qs('#new-url').dispatchEvent(new Event('input'));
+  const status = qs('#new-status');
+  const mount = qs('#new-preview');
+  mount.innerHTML = '';
+  if (!/^https?:\/\//i.test(url)) {
+    status.hidden = false; status.className = 'status-line err'; status.textContent = T.invalidUrl;
+    return;
+  }
+  status.hidden = false; status.className = 'status-line'; status.textContent = T.fetchingInfo;
+  try {
+    const opts = (P.detect(url) === 'instagram' && cfg.cookiesBrowser) ? { cookiesBrowser: cfg.cookiesBrowser } : null;
+    let info = null;
+    try { info = await K.info(url, proxy, opts); } catch (_) { info = null; }
+    if (!info) info = await K.playlist(url, proxy, opts);
+    status.hidden = true;
+    mountPreview(mount, info, url);
+  } catch (e) {
+    status.hidden = false; status.className = 'status-line err';
+    status.textContent = T.fetchFailed + ' — ' + String(e && e.message || '').slice(0, 160);
+  }
+}
+
+/* -------------------------------------------------------- search ------ */
+async function runSearch() {
+  const q = qs('#search-input').value.trim();
+  const status = qs('#search-status');
+  const grid = qs('#search-results');
+  if (!q) return;
+  if (/^https?:\/\//i.test(q)) { startFetch(q); return; }
+  status.textContent = T.searching;
+  grid.innerHTML = '';
+  try {
+    const items = await K.search(q, proxy);
+    status.textContent = items.length ? `${items.length} ${T.results}` : (T.searchHint || '');
+    for (const it of items) grid.appendChild(searchCard(it));
+  } catch (e) {
+    status.textContent = T.searchFailed;
+  }
+}
+function searchCard(it) {
+  const el = document.createElement('div');
+  el.className = 'vcard';
+  el.innerHTML = `
+    <div class="vcard-thumb">
+      ${it.thumb ? `<img src="${esc(it.thumb)}" alt="" loading="lazy">` : ''}
+      ${it.isPlaylist ? `<span class="vcard-pl">${esc(T.playlistBadge)}${it.count ? ' · ' + it.count : ''}</span>` : (it.duration ? `<span class="vcard-dur">${fmtDur(it.duration)}</span>` : '')}
+    </div>
+    <div class="vcard-body">
+      <div class="vcard-title" title="${esc(it.title)}">${esc(it.title)}</div>
+      <div class="vcard-meta">${esc(it.uploader || '')}${it.views ? ' · ' + fmtViews(it.views) + ' ' + esc(T.views) : ''}</div>
+      <div class="vcard-actions">
+        <button class="btn btn-small btn-primary" data-a="dl">${esc(T.download)}</button>
+        <button class="btn btn-small" data-a="opt">${esc(T.quality)}</button>
+      </div>
+    </div>`;
+  qs('[data-a="dl"]', el).addEventListener('click', () => {
+    if (it.isPlaylist) { go('playlists'); qs('#pl-url').value = it.url; loadPlaylist(); return; }
+    enqueue({ url: it.url, title: it.title, thumb: it.thumb, platform: 'youtube', kind: 'video', formatId: 'best', formatLabel: T.qualityBest });
+    toast(T.addedToQueue); go('queue');
+  });
+  qs('[data-a="opt"]', el).addEventListener('click', () => {
+    if (it.isPlaylist) { go('playlists'); qs('#pl-url').value = it.url; loadPlaylist(); return; }
+    startFetch(it.url);
+  });
+  return el;
+}
+qs('#search-btn').addEventListener('click', runSearch);
+qs('#search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
+
+/* ----------------------------------------------------- playlists ------ */
+async function loadPlaylist() {
+  const url = qs('#pl-url').value.trim();
+  const status = qs('#pl-status');
+  const mount = qs('#pl-preview');
+  mount.innerHTML = '';
+  if (!/^https?:\/\//i.test(url)) {
+    status.hidden = false; status.className = 'status-line err'; status.textContent = T.invalidUrl;
+    return;
+  }
+  status.hidden = false; status.className = 'status-line'; status.textContent = T.loadingPlaylist;
+  try {
+    const info = await K.playlist(url, proxy, null);
+    status.hidden = true;
+    mountPlaylist(mount, info, url);
+  } catch (e) {
+    try {
+      const info = await K.info(url, proxy, null);
+      status.hidden = true;
+      mountPlaylist(mount, info, url);
+    } catch (_) {
+      status.hidden = false; status.className = 'status-line err'; status.textContent = T.fetchFailed;
+    }
+  }
+}
+qs('#pl-load').addEventListener('click', loadPlaylist);
+qs('#pl-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') loadPlaylist(); });
+
+/* ------------------------------------------------------- library ------ */
+let libFiles = [];
+let libKind = 'all';
+async function loadLibrary() {
+  try {
+    const r = await K.libraryList();
+    libFiles = r.files || [];
+    if (r.dir) downloadsDir = r.dir;
+  } catch (_) { libFiles = []; }
+  renderLibrary();
+}
+function renderLibrary() {
+  const list = qs('#library-list');
+  const q = qs('#lib-search').value.trim().toLowerCase();
+  list.innerHTML = '';
+  const shown = libFiles.filter((f) =>
+    (libKind === 'all' || f.kind === libKind) && (!q || f.name.toLowerCase().includes(q)));
+  qs('#library-empty').hidden = shown.length > 0;
+  for (const f of shown) {
+    const el = document.createElement('div');
+    el.className = 'row-item';
+    el.innerHTML = `
+      <div class="row-main">
+        <div class="row-title" title="${esc(f.path)}">${esc(f.name)}</div>
+        <div class="row-meta">
+          <span class="kind-badge">${esc(f.kind === 'video' ? T.typeVideo : f.kind === 'audio' ? T.typeAudio : T.typeImage)}</span>
+          <span>${esc(fmtBytes(f.size / 1024))}</span>
+          <span>${esc(new Date(f.mtime).toLocaleDateString(LANG === 'fa' ? 'fa-IR' : LANG))}</span>
+        </div>
+      </div>
+      <div class="row-actions"></div>`;
+    const act = qs('.row-actions', el);
+    const mk = (ico, title, fn) => {
+      const b = document.createElement('button');
+      b.className = 'icon-btn'; b.innerHTML = icon(ico); b.title = title || '';
+      b.addEventListener('click', fn); act.appendChild(b);
+    };
+    mk('play', T.openFile, () => K.openFolder(f.path));
+    mk('folder', T.openContaining, () => K.showInFolder(f.path));
+    mk('copy', T.copyPath, () => { navigator.clipboard.writeText(f.path).catch(() => {}); });
+    mk('trash', T.deleteFile, async () => {
+      if (!window.confirm(T.confirmDelete)) return;
+      if (await K.libraryDelete(f.path)) loadLibrary();
+    });
+    list.appendChild(el);
+  }
+}
+qs('#lib-search').addEventListener('input', renderLibrary);
+qs('#lib-refresh').addEventListener('click', loadLibrary);
+qsAll('#lib-filter .seg-btn').forEach((b) => b.addEventListener('click', () => {
+  libKind = b.dataset.libKind;
+  qsAll('#lib-filter .seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+  renderLibrary();
+}));
+
+/* ------------------------------------------------------ settings ------ */
+async function loadSettingsIntoForm() {
+  qs('#s-concurrency').value = cfg.concurrency;
+  qs('#s-ratelimit').value = cfg.rateLimitKb;
+  qs('#s-quality').value = cfg.defaultQuality;
+  qs('#s-subsmode').value = cfg.subsMode;
+  qs('#s-thumbmode').value = cfg.thumbMode;
+  qs('#s-sublang').value = cfg.defaultSubLang;
+  qs('#s-cookies').value = cfg.cookiesBrowser;
+  qs('#s-dir-path').textContent = downloadsDir;
+  qs('#dir-path').textContent = downloadsDir;
+  try { qs('#s-tunnelmode').value = await K.tunnelModeGet(); } catch (_) { /* default */ }
+}
+function bindSetting(sel, key, parse) {
+  qs(sel).addEventListener('change', async (e) => {
+    const v = parse ? parse(e.target.value) : e.target.value;
+    cfg[key] = v;
+    await K.settingSet(key, v);
+  });
+}
+bindSetting('#s-theme', 'theme');
+qs('#s-theme').addEventListener('change', (e) => setTheme(e.target.value));
+bindSetting('#s-quality', 'defaultQuality');
+bindSetting('#s-concurrency', 'concurrency', (v) => Math.min(5, Math.max(1, parseInt(v, 10) || 2)));
+bindSetting('#s-ratelimit', 'rateLimitKb', (v) => Math.max(0, parseInt(v, 10) || 0));
+bindSetting('#s-subsmode', 'subsMode');
+bindSetting('#s-thumbmode', 'thumbMode');
+bindSetting('#s-sublang', 'defaultSubLang');
+bindSetting('#s-cookies', 'cookiesBrowser');
+qs('#s-lang').addEventListener('change', async (e) => {
+  const r = await K.langSet(e.target.value);
+  if (r && r.strings) { LANG = r.language; T = r.strings; applyStrings(); }
+});
+qs('#s-tunnelmode').addEventListener('change', async (e) => { await K.tunnelModeSet(e.target.value); });
+qs('#s-reset').addEventListener('click', async () => {
+  if (!window.confirm(T.confirmReset)) return;
+  await K.resetConfig();
+  toast(T.settingsTitle);
+});
+async function pickDownloadsDir() {
+  const d = await K.pickDir();
+  if (d) {
+    downloadsDir = d;
+    qs('#dir-path').textContent = d;
+    qs('#s-dir-path').textContent = d;
+  }
+}
+qs('#s-dir-pick').addEventListener('click', pickDownloadsDir);
+qs('#btn-open-folder').addEventListener('click', () => K.openFolder(downloadsDir));
+
+/* ------------------------------------------- topbar quick controls ---- */
+qsAll('#theme-seg .seg-btn').forEach((b) => b.addEventListener('click', () => setTheme(b.dataset.themePick)));
+qsAll('#lang-seg .seg-btn').forEach((b) => b.addEventListener('click', async () => {
+  if (b.dataset.langPick === LANG) return;
+  const r = await K.langSet(b.dataset.langPick);
+  if (r && r.strings) { LANG = r.language; T = r.strings; applyStrings(); applyTheme(); }
+}));
+K.onLang(({ language, strings }) => { LANG = language; T = strings; applyStrings(); });
+
+/* ---------------------------------------------------------- versions -- */
+async function loadVersions() {
+  try {
+    const v = await K.versions();
+    qs('#v-app').textContent = v.app || '—';
+    qs('#v-ytdlp').textContent = v.ytDlp || (T.missing || '—');
+    qs('#v-ffmpeg').textContent = v.ffmpeg ? (T.present || '✓') : (T.missing || '—');
+    qs('#v-aether').textContent = v.aether ? (T.present || '✓') : (T.missing || '—');
+    qs('#a-version').textContent = 'v' + (v.app || '');
+  } catch (_) { /* dev without vendor */ }
+}
+
+/* -------------------------------------------------------------- boot -- */
+(async function boot() {
+  const lg = await K.langGet();
+  LANG = lg.language || 'fa';
+  T = lg.strings || {};
+  cfg.theme = (await K.themeGet().catch(() => 'dark')) || 'dark';
+  for (const key of ['defaultQuality', 'concurrency', 'rateLimitKb', 'subsMode', 'thumbMode', 'defaultSubLang', 'cookiesBrowser']) {
+    const v = await K.settingGet(key).catch(() => null);
+    if (v !== null && v !== undefined) cfg[key] = v;
+  }
+  downloadsDir = await K.getDownloads().catch(() => '');
+  applyTheme();
+  applyStrings();
+  await loadSettingsIntoForm();
+  loadVersions();
+  // restore queue + history
+  const savedQ = await K.settingGet('queueV3').catch(() => null);
+  if (Array.isArray(savedQ)) for (const j of savedQ) { jobs.set(j.id, j); renderQueueItem(j); }
+  const savedH = await K.settingGet('historyV3').catch(() => null);
+  if (Array.isArray(savedH)) { history.push(...savedH); renderHistory(); renderHomeRecent(); }
+  updateQueueChrome();
+  refreshDiagnostics();
+  go('home');
+})();

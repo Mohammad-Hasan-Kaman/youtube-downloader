@@ -8,208 +8,297 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- ambient background -->
-  <div class="bg-mesh" aria-hidden="true"><div class="mesh m1"></div><div class="mesh m2"></div><div class="mesh m3"></div></div>
-
   <div class="app">
-    <!-- ============ Sidebar ============ -->
+    <!-- ================= Sidebar ================= -->
     <aside class="sidebar">
       <div class="brand">
-        <div class="brand-icon">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 4c6 0 12 2 14 8-2 2-6 2-8 1"/> <!-- bow curve -->
-            <path d="M4 4l14 8"/>                        <!-- string -->
-            <path d="M18.5 3.5 21 1l1 3-2 2z" fill="currentColor" stroke="none"/> <!-- arrow -->
-          </svg>
-        </div>
-        <div>
+        <svg class="brand-mark" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4c6 0 12 2 14 8-2 2-6 2-8 1"/><path d="M4 4l14 8"/><path d="M18.5 3.5 21 1l1 3-2 2z" fill="currentColor" stroke="none"/>
+        </svg>
+        <div class="brand-text">
           <div class="brand-name">KamanTube</div>
-          <div class="brand-sub" data-i18n="appName"></div>
+          <div class="brand-sub" data-i18n="tagline"></div>
         </div>
       </div>
 
-      <nav class="nav">
-        <button class="nav-btn active" data-view="home" data-i18n="home"></button>
-        <button class="nav-btn" data-view="queue">
-          <span data-i18n="queue"></span><span class="badge" id="queue-badge" hidden>0</span>
-        </button>
-        <button class="nav-btn" data-view="history" data-i18n="history"></button>
-        <button class="nav-btn" data-view="settings" data-i18n="settings"></button>
+      <nav class="nav" id="main-nav">
+        <div class="nav-group" data-i18n="groupMain"></div>
+        <button class="nav-btn" data-page="home"><span class="nav-ico" data-ico="home"></span><span data-i18n="navHome"></span></button>
+        <button class="nav-btn" data-page="search"><span class="nav-ico" data-ico="search"></span><span data-i18n="navSearch"></span></button>
+        <button class="nav-btn" data-page="new"><span class="nav-ico" data-ico="plus"></span><span data-i18n="navNew"></span></button>
+        <button class="nav-btn" data-page="playlists"><span class="nav-ico" data-ico="playlist"></span><span data-i18n="navPlaylists"></span></button>
+        <div class="nav-group" data-i18n="groupLibrary"></div>
+        <button class="nav-btn" data-page="queue"><span class="nav-ico" data-ico="queue"></span><span data-i18n="navQueue"></span><span class="badge" id="queue-badge" hidden>0</span></button>
+        <button class="nav-btn" data-page="history"><span class="nav-ico" data-ico="history"></span><span data-i18n="navHistory"></span></button>
+        <button class="nav-btn" data-page="library"><span class="nav-ico" data-ico="library"></span><span data-i18n="navLibrary"></span></button>
+        <div class="nav-group" data-i18n="groupSystem"></div>
+        <button class="nav-btn" data-page="settings"><span class="nav-ico" data-ico="settings"></span><span data-i18n="navSettings"></span></button>
+        <button class="nav-btn" data-page="diagnostics"><span class="nav-ico" data-ico="activity"></span><span data-i18n="navDiagnostics"></span></button>
+        <button class="nav-btn" data-page="about"><span class="nav-ico" data-ico="info"></span><span data-i18n="navAbout"></span></button>
       </nav>
 
       <div class="sidebar-foot">
-        <div class="lang-row">
-          <span data-i18n="language"></span>
-          <div class="seg">
-            <button class="seg-b active" data-lang="fa" data-i18n="fa"></button>
-            <button class="seg-b" data-lang="en" data-i18n="en"></button>
-          </div>
-        </div>
-        <div class="dir-row">
-          <span class="muted" data-i18n="dirLabel"></span>
-          <button class="mini-btn" id="btn-dir" data-i18n="change"></button>
-        </div>
-        <div class="dir-path" id="dir-path"></div>
-        <button class="mini-btn wide" id="btn-open-folder" data-i18n="openFolder"></button>
+        <div class="dir-label"><span data-i18n="downloadDir"></span></div>
+        <div class="dir-path" id="dir-path">…</div>
+        <button class="btn btn-small btn-block" id="btn-open-folder"><span class="btn-ico" data-ico="folder"></span><span data-i18n="openFolder"></span></button>
       </div>
     </aside>
 
-    <!-- ============ Main ============ -->
+    <!-- ================= Main ================= -->
     <main class="main">
       <header class="topbar">
-        <div class="searchbox">
-          <svg class="search-ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="search-input" type="text" spellcheck="false" />
-          <button class="go-btn" id="btn-search" data-i18n="search"></button>
-        </div>
-        <div class="net" id="net-chip" title="">
-          <span class="net-dot" id="net-dot"></span>
-          <div class="net-txt">
-            <div class="net-ip" id="net-ip">…</div>
-            <div class="net-state" id="net-state" data-i18n="checking"></div>
+        <h1 class="page-title" id="page-title"></h1>
+        <div class="topbar-end">
+          <div class="net-chip" id="net-chip">
+            <span class="net-dot" id="net-dot"></span>
+            <div class="net-text">
+              <div class="net-ip" id="net-ip">…</div>
+              <div class="net-state" id="net-state"></div>
+            </div>
+          </div>
+          <div class="seg" id="theme-seg" role="group" aria-label="theme">
+            <button class="seg-btn" data-theme-pick="dark" data-i18n-title="themeDark">◐</button>
+            <button class="seg-btn" data-theme-pick="light" data-i18n-title="themeLight">○</button>
+            <button class="seg-btn" data-theme-pick="system" data-i18n-title="themeSystem">◑</button>
+          </div>
+          <div class="seg" id="lang-seg" role="group" aria-label="language">
+            <button class="seg-btn" data-lang-pick="fa">فا</button>
+            <button class="seg-btn" data-lang-pick="en">EN</button>
+            <button class="seg-btn" data-lang-pick="de">DE</button>
           </div>
         </div>
       </header>
 
-      <section class="view" id="view-body">
-        <!-- HOME -->
-        <div class="view-pane active" id="pane-home">
-          <div class="hero card" id="hero-box">
-            <div class="hero-bow">
-              <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round">
-                <path d="M4 4c6 0 12 2 14 8-2 2-6 2-8 1"/><path d="M4 4l14 8"/><path d="M18.5 3.5 21 1l1 3-2 2z" fill="currentColor" stroke="none"/>
-              </svg>
-            </div>
-            <h1 class="hero-title">KamanTube</h1>
-            <p class="hero-sub" data-i18n="searchPlaceholder"></p>
-            <div class="hero-note" data-i18n="tunnelNote"></div>
-          </div>
-          <div id="home-skel" class="grid" hidden></div>
-          <div id="grid-results" class="grid"></div>
-          <div id="home-empty" class="empty" data-i18n="emptyHistory"></div>
-        </div>
+      <div class="pages" id="pages">
 
-        <!-- VIDEO -->
-        <div class="view-pane" id="pane-video">
-          <button class="back-btn" data-back="home" data-i18n="backHome"></button>
-          <div class="video-wrap card" id="video-wrap">
-            <div class="video-thumb">
-              <img id="v-thumb" alt="" />
-              <div class="v-duration" id="v-duration"></div>
-              <div class="thumb-shade"></div>
-            </div>
-            <div class="video-info">
-              <h2 id="v-title"></h2>
-              <div class="v-meta">
-                <span id="v-channel" class="v-channel"></span>
-                <span class="dot">•</span>
-                <span id="v-views"></span>
-                <span class="dot">•</span>
-                <span id="v-date"></span>
-              </div>
-              <div class="quality-head">
-                <h3 data-i18n="quality"></h3>
-                <span class="muted small" id="q-hint"></span>
-              </div>
-              <div class="q-grid" id="q-grid"></div>
-              <div class="opt-row">
-                <div class="opt">
-                  <label data-i18n="subtitle"></label>
-                  <div id="v-subs-btns"></div>
-                </div>
-                <label class="opt chk">
-                  <input type="checkbox" id="v-thumbdl" />
-                  <span data-i18n="thumbLabel"></span>
-                </label>
-                <div class="grow"></div>
-                <button class="btn primary" id="btn-addq" data-i18n="download"></button>
-                <button class="btn ghost" id="btn-audio" data-i18n="audio"></button>
-              </div>
-            </div>
+        <!-- ======== HOME ======== -->
+        <section class="page" data-page-panel="home">
+          <h2 class="page-h" data-i18n="homeTitle"></h2>
+          <p class="page-sub" data-i18n="homeSub"></p>
+          <div class="paste-box">
+            <input type="text" id="home-url" class="url-input" spellcheck="false" />
+            <span class="platform-tag" id="home-platform" hidden></span>
+            <button class="btn btn-primary" id="home-fetch" data-i18n="fetchBtn"></button>
           </div>
-        </div>
-
-        <!-- PLAYLIST -->
-        <div class="view-pane" id="pane-playlist">
-          <button class="back-btn" data-back="home" data-i18n="backHome"></button>
-          <div class="pl-head card">
-            <img id="pl-thumb" alt="" />
-            <div>
-              <h2 id="pl-title"></h2>
-              <div class="v-meta"><span id="pl-count" class="muted"></span></div>
-            </div>
-            <div class="grow"></div>
-            <button class="btn primary" id="btn-pl-all" data-i18n="downloadAll"></button>
+          <h3 class="section-h" data-i18n="supportedPlatforms"></h3>
+          <div class="platform-grid" id="platform-grid"></div>
+          <div id="home-recent-wrap" hidden>
+            <h3 class="section-h" data-i18n="navHistory"></h3>
+            <div class="list" id="home-recent"></div>
           </div>
-          <div class="pl-items" id="pl-items"></div>
-        </div>
+        </section>
 
-        <!-- QUEUE -->
-        <div class="view-pane" id="pane-queue">
+        <!-- ======== SEARCH ======== -->
+        <section class="page" data-page-panel="search">
+          <div class="search-row">
+            <input type="text" id="search-input" class="url-input" spellcheck="false" />
+            <button class="btn btn-primary" id="search-btn" data-i18n="searchBtn"></button>
+          </div>
+          <p class="page-sub" id="search-status" data-i18n="searchHint"></p>
+          <div class="cards" id="search-results"></div>
+        </section>
+
+        <!-- ======== NEW DOWNLOAD ======== -->
+        <section class="page" data-page-panel="new">
+          <p class="page-sub" data-i18n="newSub"></p>
+          <div class="paste-box">
+            <input type="text" id="new-url" class="url-input" spellcheck="false" />
+            <span class="platform-tag" id="new-platform" hidden></span>
+            <button class="btn btn-primary" id="new-fetch" data-i18n="fetchBtn"></button>
+          </div>
+          <div class="status-line" id="new-status" hidden></div>
+          <div id="new-preview"></div>
+        </section>
+
+        <!-- ======== PLAYLISTS ======== -->
+        <section class="page" data-page-panel="playlists">
+          <p class="page-sub" data-i18n="playlistsSub"></p>
+          <div class="paste-box">
+            <input type="text" id="pl-url" class="url-input" spellcheck="false" />
+            <button class="btn btn-primary" id="pl-load" data-i18n="loadPlaylist"></button>
+          </div>
+          <div class="status-line" id="pl-status" hidden></div>
+          <div id="pl-preview"></div>
+          <div id="pl-jobs"></div>
+        </section>
+
+        <!-- ======== QUEUE ======== -->
+        <section class="page" data-page-panel="queue">
           <div class="row-between">
-            <h2 data-i18n="queue"></h2>
-            <button class="mini-btn" id="btn-clear-q" data-i18n="clearQueue"></button>
+            <div class="overall" id="queue-overall" hidden>
+              <span data-i18n="overallProgress"></span>
+              <div class="bar bar-wide"><div class="bar-fill" id="queue-overall-fill"></div></div>
+              <span class="mono" id="queue-overall-pct">0%</span>
+            </div>
+            <span class="grow"></span>
+            <button class="btn btn-small" id="queue-clear" data-i18n="clearCompleted"></button>
           </div>
-          <div id="queue-items" class="queue-list"></div>
-          <div class="empty" id="queue-empty" data-i18n="emptyQueue"></div>
-        </div>
+          <div class="list" id="queue-list"></div>
+          <div class="empty" id="queue-empty" data-i18n="queueEmpty"></div>
+        </section>
 
-        <!-- HISTORY -->
-        <div class="view-pane" id="pane-history">
-          <h2 data-i18n="history"></h2>
-          <div id="history-items" class="queue-list history"></div>
-          <div class="empty" id="history-empty" data-i18n="emptyHistory"></div>
-        </div>
+        <!-- ======== HISTORY ======== -->
+        <section class="page" data-page-panel="history">
+          <div class="row-between">
+            <span class="grow"></span>
+            <button class="btn btn-small" id="history-clear" data-i18n="clearHistory"></button>
+          </div>
+          <div class="list" id="history-list"></div>
+          <div class="empty" id="history-empty" data-i18n="historyEmpty"></div>
+        </section>
 
-        <!-- SETTINGS -->
-        <div class="view-pane" id="pane-settings">
-          <h2 data-i18n="settings"></h2>
+        <!-- ======== LIBRARY ======== -->
+        <section class="page" data-page-panel="library">
+          <div class="search-row">
+            <input type="text" id="lib-search" class="url-input" spellcheck="false" />
+            <div class="seg" id="lib-filter">
+              <button class="seg-btn active" data-lib-kind="all" data-i18n="allTypes"></button>
+              <button class="seg-btn" data-lib-kind="video" data-i18n="typeVideo"></button>
+              <button class="seg-btn" data-lib-kind="audio" data-i18n="typeAudio"></button>
+              <button class="seg-btn" data-lib-kind="image" data-i18n="typeImage"></button>
+            </div>
+            <button class="btn" id="lib-refresh" data-i18n="refresh"></button>
+          </div>
+          <div class="list" id="library-list"></div>
+          <div class="empty" id="library-empty" data-i18n="libraryEmpty" hidden></div>
+        </section>
+
+        <!-- ======== SETTINGS ======== -->
+        <section class="page" data-page-panel="settings">
           <div class="settings-grid">
-            <fieldset class="setting-group">
-              <legend data-i18n="themeTitle"></legend>
-              <div class="seg">
-                <button class="seg-b" data-theme="dark" data-i18n="themeDark"></button>
-                <button class="seg-b" data-theme="light" data-i18n="themeLight"></button>
-                <button class="seg-b" data-theme="auto" data-i18n="themeAuto"></button>
-              </div>
-            </fieldset>
-            <fieldset class="setting-group">
-              <legend data-i18n="downloadOptions"></legend>
-              <label class="opt chk">
-                <input type="checkbox" id="s-embed-subs" />
-                <span data-i18n="embedSubs"></span>
-              </label>
-              <label class="opt chk">
-                <input type="checkbox" id="s-embed-thumb" />
-                <span data-i18n="embedThumb"></span>
-              </label>
-              <label class="opt chk">
-                <input type="checkbox" id="s-separate-files" />
-                <span data-i18n="separateFiles"></span>
-              </label>
-            </fieldset>
-            <fieldset class="setting-group">
-              <legend data-i18n="tunnelTitle"></legend>
-              <div class="opt">
-                <label data-i18n="tunnelMode"></label>
-                <select id="s-tunnel-mode">
-                  <option value="auto" data-i18n="auto"></option>
-                  <option value="forced" data-i18n="forced"></option>
-                  <option value="direct" data-i18n="tunnelModeDirect"></option>
+            <fieldset class="card">
+              <legend data-i18n="secGeneral"></legend>
+              <label class="field"><span data-i18n="language"></span>
+                <select id="s-lang">
+                  <option value="fa" data-i18n="langFa"></option>
+                  <option value="en" data-i18n="langEn"></option>
+                  <option value="de" data-i18n="langDe"></option>
                 </select>
-              </div>
+              </label>
+              <label class="field"><span data-i18n="theme"></span>
+                <select id="s-theme">
+                  <option value="dark" data-i18n="themeDark"></option>
+                  <option value="light" data-i18n="themeLight"></option>
+                  <option value="system" data-i18n="themeSystem"></option>
+                </select>
+              </label>
+              <label class="field"><span data-i18n="downloadDir"></span>
+                <span class="dir-inline"><span class="dir-path" id="s-dir-path">…</span>
+                <button class="btn btn-small" id="s-dir-pick" data-i18n="change"></button></span>
+              </label>
             </fieldset>
-            <fieldset class="setting-group">
-              <legend data-i18n="advanced"></legend>
-              <button class="btn secondary" id="btn-reset-config" data-i18n="resetConfig"></button>
+
+            <fieldset class="card">
+              <legend data-i18n="secDownloads"></legend>
+              <label class="field"><span data-i18n="defaultQuality"></span>
+                <select id="s-quality">
+                  <option value="best" data-i18n="qualityBest"></option>
+                  <option value="2160">2160p</option><option value="1440">1440p</option>
+                  <option value="1080">1080p</option><option value="720">720p</option>
+                  <option value="480">480p</option><option value="360">360p</option>
+                  <option value="240">240p</option><option value="144">144p</option>
+                </select>
+              </label>
+              <label class="field"><span data-i18n="concurrency"></span>
+                <input type="number" id="s-concurrency" min="1" max="5" step="1" />
+              </label>
+              <label class="field"><span data-i18n="speedLimit"></span>
+                <input type="number" id="s-ratelimit" min="0" step="50" />
+              </label>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend data-i18n="secSubsThumb"></legend>
+              <label class="field"><span data-i18n="subsMode"></span>
+                <select id="s-subsmode">
+                  <option value="embedded" data-i18n="modeEmbedded"></option>
+                  <option value="separate" data-i18n="modeSeparate"></option>
+                  <option value="disabled" data-i18n="modeDisabled"></option>
+                </select>
+              </label>
+              <label class="field"><span data-i18n="thumbMode"></span>
+                <select id="s-thumbmode">
+                  <option value="embedded" data-i18n="modeEmbedded"></option>
+                  <option value="separate" data-i18n="modeSeparate"></option>
+                  <option value="disabled" data-i18n="modeDisabled"></option>
+                </select>
+              </label>
+              <label class="field"><span data-i18n="defaultSubLang"></span>
+                <input type="text" id="s-sublang" spellcheck="false" placeholder="fa" />
+              </label>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend data-i18n="secNetwork"></legend>
+              <label class="field"><span data-i18n="tunnelMode"></span>
+                <select id="s-tunnelmode">
+                  <option value="auto" data-i18n="tunnelAuto"></option>
+                  <option value="forced" data-i18n="tunnelForced"></option>
+                  <option value="direct" data-i18n="tunnelDirect"></option>
+                </select>
+              </label>
+              <p class="note" data-i18n="tunnelNote"></p>
+              <label class="field"><span data-i18n="cookiesTitle"></span>
+                <select id="s-cookies">
+                  <option value="" data-i18n="cookiesOff"></option>
+                  <option value="chrome">Chrome</option>
+                  <option value="edge">Edge</option>
+                  <option value="firefox">Firefox</option>
+                  <option value="brave">Brave</option>
+                </select>
+              </label>
+              <p class="note" data-i18n="cookiesNote"></p>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend data-i18n="secAdvanced"></legend>
+              <div class="kv"><span data-i18n="appVersion"></span><b class="mono" id="v-app">…</b></div>
+              <div class="kv"><span data-i18n="ytDlpVersion"></span><b class="mono" id="v-ytdlp">…</b></div>
+              <div class="kv"><span data-i18n="ffmpegState"></span><b id="v-ffmpeg">…</b></div>
+              <div class="kv"><span data-i18n="aetherState"></span><b id="v-aether">…</b></div>
+              <button class="btn btn-danger" id="s-reset" data-i18n="resetConfig"></button>
             </fieldset>
           </div>
-        </div>
-      </section>
+        </section>
+
+        <!-- ======== DIAGNOSTICS ======== -->
+        <section class="page" data-page-panel="diagnostics">
+          <div class="diag-grid">
+            <div class="card kv-card">
+              <div class="kv"><span data-i18n="publicIp"></span><b class="mono" id="d-ip">…</b></div>
+              <div class="kv"><span data-i18n="country"></span><b id="d-country">…</b></div>
+              <div class="kv"><span data-i18n="routingMode"></span><b id="d-route">…</b></div>
+              <div class="kv"><span data-i18n="protocol"></span><b id="d-protocol">…</b></div>
+              <button class="btn btn-primary" id="d-recheck" data-i18n="recheck"></button>
+            </div>
+            <div class="card log-card">
+              <div class="card-h" data-i18n="connectionLog"></div>
+              <pre class="log" id="d-log"></pre>
+            </div>
+          </div>
+        </section>
+
+        <!-- ======== ABOUT ======== -->
+        <section class="page" data-page-panel="about">
+          <div class="about-box">
+            <svg class="brand-mark big" viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 4c6 0 12 2 14 8-2 2-6 2-8 1"/><path d="M4 4l14 8"/><path d="M18.5 3.5 21 1l1 3-2 2z" fill="currentColor" stroke="none"/>
+            </svg>
+            <h2 class="about-name">KamanTube</h2>
+            <div class="about-slogan" data-i18n="slogan"></div>
+            <div class="about-ver mono" id="a-version"></div>
+            <p class="about-text" data-i18n="aboutText"></p>
+            <p class="note" data-i18n="licenseLine"></p>
+            <a class="repo-link" href="https://github.com/Mohammad-Hasan-Kaman/youtube-downloader" data-i18n="repoLine"></a>
+          </div>
+        </section>
+
+      </div>
     </main>
   </div>
 
   <div class="toasts" id="toasts"></div>
+  <script src="../src/providers.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
