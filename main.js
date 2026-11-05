@@ -190,15 +190,40 @@ ipcMain.handle('tunnel:get', async () => ({
 ipcMain.handle('tunnel:recheck', async () => { await tunnel.ensure(); return null; });
 
 // yt-dlp operations
-// If the renderer didn't know the tunnel is up yet (tunnel connects in
-// background), fall back to the live tunnel proxy automatically.
+// Per-site routing (mission section 7.3): the best route depends on the
+// destination, not just the country. YouTube from Iran needs the tunnel
+// (direct hits a bot wall), while TikTok geo-blocks the tunnel exit
+// (HTTP 451) and works direct. Extraction calls therefore try the
+// preferred route first and fall back to the other route on failure.
+// 'direct' as proxy is an explicit renderer request for a direct route.
 function withProxy(proxy) {
+  if (proxy === 'direct') return '';
   if (proxy) return proxy;
   return (tunnel && tunnel.usingTunnel) ? tunnel.proxyUrl() : '';
 }
-ipcMain.handle('yt:search', async (_e, q, proxy) => yt.search(q, withProxy(proxy)));
-ipcMain.handle('yt:info', async (_e, url, proxy, opts) => yt.info(url, withProxy(proxy), opts || null));
-ipcMain.handle('yt:playlist', async (_e, url, proxy, opts) => yt.playlist(url, withProxy(proxy), opts || null));
+function routeOrder() {
+  const t = (tunnel && tunnel.usingTunnel) ? tunnel.proxyUrl() : '';
+  return t ? [t, ''] : [''];
+}
+async function withRouteFallback(fn) {
+  let lastErr = null;
+  for (const p of routeOrder()) {
+    try { return await fn(p); } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('request failed');
+}
+ipcMain.handle('yt:search', async (_e, q, proxy) => {
+  if (proxy) return yt.search(q, withProxy(proxy));
+  return withRouteFallback((p) => yt.search(q, p));
+});
+ipcMain.handle('yt:info', async (_e, url, proxy, opts) => {
+  if (proxy) return yt.info(url, withProxy(proxy), opts || null);
+  return withRouteFallback((p) => yt.info(url, p, opts || null));
+});
+ipcMain.handle('yt:playlist', async (_e, url, proxy, opts) => {
+  if (proxy) return yt.playlist(url, withProxy(proxy), opts || null);
+  return withRouteFallback((p) => yt.playlist(url, p, opts || null));
+});
 ipcMain.handle('yt:download', async (_e, job, proxy) => yt.download(job, withProxy(proxy)));
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));
 

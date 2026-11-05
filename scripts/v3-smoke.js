@@ -22,7 +22,7 @@ function check(name, ok, extra) {
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
   const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
-  const page = list.find((t) => t.type === 'page');
+  const page = list.find((t) => t.type === 'page' && /renderer\/index\.html/.test(t.url || '')) || list.find((t) => t.type === 'page');
   if (!page) throw new Error('no page target on CDP');
   const ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });

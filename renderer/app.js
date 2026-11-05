@@ -255,6 +255,7 @@ async function pump() {
     j.status = 'downloading';
     paintJob(j);
     n++;
+    j.usedProxy = j.forceDirect ? '' : proxy;
     try {
       const realId = await K.download({
         id: j.id, url: j.url, title: j.title, kind: j.kind,
@@ -264,7 +265,7 @@ async function pump() {
         rateLimitKb: j.rateLimitKb || 0,
         cookiesBrowser: j.cookiesBrowser || undefined,
         outDir: j.outDir || downloadsDir,
-      }, proxy);
+      }, j.forceDirect ? 'direct' : proxy);
       if (realId && realId !== j.id) { /* engine honours our id */ }
     } catch (e) {
       j.status = 'failed';
@@ -310,6 +311,15 @@ K.onYtEvent((e) => {
   }
   if (e.type === 'error') {
     if (j.status === 'paused') return;
+    // Per-site route flip: the tunnel exit is geo-blocked by some sites
+    // (TikTok answers HTTP 451). Retry the job once on the direct route.
+    if (!j.routeFlipped && j.usedProxy && /451|Unavailable For Legal|not available in your (country|region)|geo/i.test(String(e.message || ''))) {
+      j.routeFlipped = true;
+      j.forceDirect = true;
+      j.status = 'queued'; j.pct = 0; j.error = '';
+      paintJob(j); persistQueue(); pump(); updateOverall();
+      return;
+    }
     j.status = 'failed';
     j.error = /Sign in to confirm|not a bot/i.test(String(e.message || ''))
       ? (T.botCheckHint || String(e.message).slice(0, 240))
