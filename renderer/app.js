@@ -45,8 +45,11 @@ let net = { state: 'checking', ip: null, country: null, usingTunnel: false, prot
 let downloadsDir = '';
 const cfg = {
   theme: 'system', defaultQuality: 'best', concurrency: 2, rateLimitKb: 0,
-  subsMode: 'embedded', thumbMode: 'embedded', defaultSubLang: '', cookiesBrowser: '',
+  subsMode: 'embedded', thumbMode: 'embedded', defaultSubLang: '',
+  accountMode: 'off', accountBrowser: 'chrome', cookiesFile: '',
+  blockAdult: true, blockedExtra: '',
 };
+let RTL = true;
 const PLATFORM_COLORS = { youtube: '#e62117', pinterest: '#c8232c', instagram: '#b83a7d', tiktok: '#3aa6a0', x: '#888', web: '#c8871a' };
 const NAV_KEYS = { home: 'navHome', search: 'navSearch', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
 
@@ -63,7 +66,8 @@ const fmtDur = (s) => {
 };
 const fmtViews = (n) => {
   if (!n) return '';
-  try { return new Intl.NumberFormat(LANG === 'fa' ? 'fa-IR' : LANG, { notation: 'compact' }).format(n); }
+  const loc = { fa: 'fa-IR', zh: 'zh-CN' }[LANG] || LANG;
+  try { return new Intl.NumberFormat(loc, { notation: 'compact' }).format(n); }
   catch (_) { return String(n); }
 };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -80,7 +84,7 @@ function toast(msg, isErr) {
 /* -------------------------------------------------------- i18n -------- */
 function applyStrings() {
   document.documentElement.lang = LANG;
-  document.documentElement.dir = LANG === 'fa' ? 'rtl' : 'ltr';
+  document.documentElement.dir = RTL ? 'rtl' : 'ltr';
   qsAll('[data-i18n]').forEach((el) => { const v = T[el.dataset.i18n]; if (v) el.textContent = v; });
   qsAll('[data-i18n-title]').forEach((el) => { const v = T[el.dataset.i18nTitle]; if (v) el.title = v; });
   qs('#page-title').textContent = T[NAV_KEYS[page]] || '';
@@ -92,6 +96,7 @@ function applyStrings() {
   qsAll('#lang-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.langPick === LANG));
   const sel = qs('#s-lang'); if (sel) sel.value = LANG;
   renderPlatformGrid();
+  renderExploreGrid();
   renderNetChip();
   renderQueue();
   renderHistory();
@@ -201,17 +206,34 @@ async function persistHistory() {
   try { await K.settingSet('historyV3', history.slice(0, 200)); } catch (_) { /* non-fatal */ }
 }
 
-function jobOptions() {
-  return {
+/**
+ * Account access (Settings -> Account): the app never asks for or
+ * stores a password. It either reads the signed-in session from the
+ * user's own browser, or the user's own cookies.txt file - only with
+ * the explicit mode they chose, never by default.
+ */
+function accountOpts() {
+  if (cfg.accountMode === 'browser' && cfg.accountBrowser) return { cookiesBrowser: cfg.accountBrowser };
+  if (cfg.accountMode === 'file' && cfg.cookiesFile) return { cookiesFile: cfg.cookiesFile };
+  return null;
+}
+function jobOptions(input) {
+  const base = {
     subsMode: cfg.subsMode, thumbMode: cfg.thumbMode,
     rateLimitKb: cfg.rateLimitKb || 0,
-    cookiesBrowser: cfg.cookiesBrowser || '',
   };
+  if (!input || input.useAccount !== false) Object.assign(base, accountOpts() || {});
+  return base;
+}
+/** Instant client-side mirror of the main-process site block. */
+function urlBlocked(url) {
+  return P.isBlocked(url, { adult: cfg.blockAdult !== false, extra: cfg.blockedExtra || '' });
 }
 
 function enqueue(input) {
   const url = String(input.url || '').trim();
   if (!url) return null;
+  if (urlBlocked(url)) { toast(T.blockedMsg, true); return null; }
   const formatId = input.formatId || 'best';
   for (const j of jobs.values()) {
     if (j.url === url && j.formatId === formatId && ['queued', 'downloading', 'merging', 'paused'].includes(j.status)) {
@@ -229,7 +251,7 @@ function enqueue(input) {
     subLang: input.subLang || '', outDir: downloadsDir,
     playlistId: input.playlistId || null,
     status: 'queued', pct: 0, downloadedKb: 0, totalKb: 0, speedKb: 0, eta: '', error: '',
-    ...jobOptions(),
+    ...jobOptions(input),
     ...(input.subsMode ? { subsMode: input.subsMode } : {}),
     ...(input.thumbMode ? { thumbMode: input.thumbMode } : {}),
   };
@@ -264,6 +286,7 @@ async function pump() {
         subsMode: j.subsMode, thumbMode: j.thumbMode,
         rateLimitKb: j.rateLimitKb || 0,
         cookiesBrowser: j.cookiesBrowser || undefined,
+        cookiesFile: j.cookiesFile || undefined,
         outDir: j.outDir || downloadsDir,
       }, j.forceDirect ? 'direct' : proxy);
       if (realId && realId !== j.id) { /* engine honours our id */ }
@@ -321,9 +344,14 @@ K.onYtEvent((e) => {
       return;
     }
     j.status = 'failed';
-    j.error = /Sign in to confirm|not a bot/i.test(String(e.message || ''))
-      ? (T.botCheckHint || String(e.message).slice(0, 240))
-      : String(e.message || '').slice(0, 240);
+    const em = String(e.message || '');
+    j.error = /blocked-by-user-list/.test(em)
+      ? (T.blockedMsg || em)
+      : /Sign in to confirm|not a bot/i.test(em)
+        ? (T.botCheckHint || em.slice(0, 240))
+        : /login required|sign in|cookies/i.test(em) && cfg.accountMode === 'off'
+          ? (T.loginNeededHint || em.slice(0, 240))
+          : em.slice(0, 240);
     paintJob(j); pushHistory(j); toast(T.downloadFailed, true);
     persistQueue(); pump(); updateOverall();
   }
@@ -346,7 +374,7 @@ function renderQueueItem(j) {
   el.innerHTML = `
     ${j.thumb ? `<img class="row-thumb" src="${esc(j.thumb)}" alt="" loading="lazy">` : ''}
     <div class="row-main">
-      <div class="row-title" title="${esc(j.title)}">${esc(j.title)}</div>
+      <div class="row-title bidi" dir="auto" title="${esc(j.title)}">${esc(j.title)}</div>
       <div class="row-meta">
         <span class="kind-badge">${esc(T[P.getProvider(j.platform).nameKey] || j.platform)}</span>
         <span class="status" data-f="status"></span>
@@ -459,7 +487,7 @@ function historyRow(h) {
   el.innerHTML = `
     ${h.thumb ? `<img class="row-thumb" src="${esc(h.thumb)}" alt="" loading="lazy">` : ''}
     <div class="row-main">
-      <div class="row-title" title="${esc(h.title)}">${esc(h.title)}</div>
+      <div class="row-title bidi" dir="auto" title="${esc(h.title)}">${esc(h.title)}</div>
       <div class="row-meta">
         <span class="kind-badge">${esc(T[P.getProvider(h.platform || 'web').nameKey] || '')}</span>
         <span class="status ${h.status === 'done' ? 'done' : 'failed'}">${h.status === 'done' ? (T.statusDone || '') : (T.statusFailed || '')}</span>
@@ -503,6 +531,7 @@ qs('#history-clear').addEventListener('click', () => {
 function mountPreview(mount, info, sourceUrl) {
   mount.innerHTML = '';
   if (info.type === 'playlist') { mountPlaylist(mount, info, sourceUrl); return; }
+  if (info.type === 'image') { mountImage(mount, info, sourceUrl); return; }
   const platform = P.detect(sourceUrl) || 'web';
   const wrap = document.createElement('div');
   wrap.className = 'preview card';
@@ -511,13 +540,14 @@ function mountPreview(mount, info, sourceUrl) {
   wrap.innerHTML = `
     <div class="preview-media">${info.thumb ? `<img src="${esc(info.thumb)}" alt="">` : ''}</div>
     <div class="preview-main">
-      <h3 class="preview-title">${esc(info.title)}</h3>
+      <h3 class="preview-title bidi" dir="auto">${esc(info.title)}</h3>
       <div class="preview-meta">
         <span class="kind-badge">${esc(T[P.getProvider(platform).nameKey] || platform)}</span>
         ${info.uploader ? `<span>${esc(T.channel)}: ${esc(info.uploader)}</span>` : ''}
         ${info.duration ? `<span>${esc(T.duration)}: ${fmtDur(info.duration)}</span>` : ''}
         ${info.views ? `<span>${esc(T.views)}: ${fmtViews(info.views)}</span>` : ''}
       </div>
+      ${platform === 'web' ? `<div class="status-line warn-line">${esc(T.genericWarn)}</div>` : ''}
       <div class="opt-label">${esc(T.quality)}</div>
       <div class="q-list" data-role="qualities"></div>
       <div class="opt-row">
@@ -535,6 +565,11 @@ function mountPreview(mount, info, sourceUrl) {
             <option value="separate">${esc(T.modeSeparate)}</option>
             <option value="disabled">${esc(T.modeDisabled)}</option>
           </select></label>
+        ${accountOpts() ? `<label class="opt-field"><span>${esc(T.sessUse)}</span>
+          <select data-role="sessuse">
+            <option value="on">${esc(T.sessInherit)}</option>
+            <option value="off">${esc(T.sessOff)}</option>
+          </select></label>` : ''}
       </div>
       <div class="preview-actions">
         <button class="btn btn-primary" data-role="download">${icon('dl')}<span>${esc(T.download)}</span></button>
@@ -574,11 +609,13 @@ function mountPreview(mount, info, sourceUrl) {
     const has = [...subSel.options].some((o) => o.value === cfg.defaultSubLang);
     if (has) subSel.value = cfg.defaultSubLang;
   }
+  const sessSel = qs('[data-role="sessuse"]', wrap);
   const base = () => ({
     url: info.url || sourceUrl, title: info.title, platform,
     thumb: info.thumb, subLang: subSel.value || '',
     subsMode: qs('[data-role="subsmode"]', wrap).value,
     thumbMode: qs('[data-role="thumbmode"]', wrap).value,
+    useAccount: sessSel ? sessSel.value !== 'off' : undefined,
   });
   qs('[data-role="download"]', wrap).addEventListener('click', () => {
     enqueue({ ...base(), kind: 'video', formatId: chosen.formatId, formatLabel: chosen.label });
@@ -587,6 +624,36 @@ function mountPreview(mount, info, sourceUrl) {
   });
   qs('[data-role="audio"]', wrap).addEventListener('click', () => {
     enqueue({ ...base(), kind: 'audio', formatId: 'audio', formatLabel: T.audioOnly });
+    toast(T.addedToQueue);
+    go('queue');
+  });
+}
+
+function mountImage(mount, info, sourceUrl) {
+  const platform = P.detect(sourceUrl) || 'web';
+  const wrap = document.createElement('div');
+  wrap.className = 'preview card';
+  const dims = info.image && info.image.width ? `${info.image.width}×${info.image.height}` : '';
+  wrap.innerHTML = `
+    <div class="preview-media">${info.thumb ? `<img src="${esc(info.thumb)}" alt="">` : ''}</div>
+    <div class="preview-main">
+      <h3 class="preview-title bidi" dir="auto">${esc(info.title)}</h3>
+      <div class="preview-meta">
+        <span class="kind-badge">${esc(T[P.getProvider(platform).nameKey] || platform)}</span>
+        <span class="kind-badge">${esc(T.typeImage)}</span>
+        ${dims ? `<span class="mono">${dims}</span>` : ''}
+        ${info.image && info.image.size ? `<span>${esc(T.size)}: ${esc(fmtBytes(info.image.size / 1024))}</span>` : ''}
+      </div>
+      <div class="preview-actions">
+        <button class="btn btn-primary" data-role="download">${icon('dl')}<span>${esc(T.imgDownload)}</span></button>
+      </div>
+    </div>`;
+  mount.appendChild(wrap);
+  qs('[data-role="download"]', wrap).addEventListener('click', () => {
+    enqueue({
+      url: info.url || sourceUrl, title: info.title, platform, thumb: info.thumb,
+      kind: 'image', formatId: info.image ? info.image.formatId : 'best', formatLabel: T.typeImage,
+    });
     toast(T.addedToQueue);
     go('queue');
   });
@@ -601,7 +668,7 @@ function mountPlaylist(mount, info, sourceUrl) {
     <div class="pl-head card">
       ${firstThumb ? `<img src="${esc(firstThumb)}" alt="">` : ''}
       <div>
-        <div class="pl-head-title">${esc(info.title || T.playlistBadge)}</div>
+        <div class="pl-head-title bidi" dir="auto">${esc(info.title || T.playlistBadge)}</div>
         <div class="preview-meta"><span class="kind-badge">${esc(T[P.getProvider(platform).nameKey] || platform)}</span>
         <span>${(info.entries || []).length} ${esc(T.items)}</span></div>
       </div>
@@ -622,7 +689,7 @@ function mountPlaylist(mount, info, sourceUrl) {
       <input type="checkbox" checked data-url="${esc(e.url)}" data-title="${esc(e.title)}" data-thumb="${esc(e.thumb || '')}">
       ${e.thumb ? `<img class="row-thumb" src="${esc(e.thumb)}" alt="" loading="lazy">` : ''}
       <span class="row-main">
-        <span class="row-title">${esc(e.title)}</span>
+        <span class="row-title bidi" dir="auto">${esc(e.title)}</span>
         <span class="row-meta">${e.uploader ? `<span>${esc(e.uploader)}</span>` : ''}${e.duration ? `<span>${fmtDur(e.duration)}</span>` : ''}</span>
       </span>`;
     list.appendChild(row);
@@ -645,22 +712,41 @@ function mountPlaylist(mount, info, sourceUrl) {
 }
 
 /* ---------------------------------------------------------- home ------ */
+function platformCard(p, onClick) {
+  const b = document.createElement('button');
+  b.className = 'platform-card';
+  const chips = (p.features || []).map((f) => `<span class="chip">${esc(T[f] || '')}</span>`).join('');
+  b.innerHTML = `
+    <span class="platform-dot" style="background:${PLATFORM_COLORS[p.id] || '#888'}"></span>
+    <span class="platform-body"><span class="platform-name">${esc(T[p.nameKey] || p.id)}</span>
+    <span class="platform-note" style="display:block">${esc(T[p.noteKey] || '')}</span>
+    ${chips ? `<span class="feat-chips">${chips}</span>` : ''}</span>`;
+  b.addEventListener('click', onClick);
+  return b;
+}
 function renderPlatformGrid() {
   const grid = qs('#platform-grid');
   if (!grid) return;
   grid.innerHTML = '';
   for (const p of [...P.PROVIDERS, P.FALLBACK]) {
-    const b = document.createElement('button');
-    b.className = 'platform-card';
-    b.innerHTML = `
-      <span class="platform-dot" style="background:${PLATFORM_COLORS[p.id] || '#888'}"></span>
-      <span><span class="platform-name">${esc(T[p.nameKey] || p.id)}</span>
-      <span class="platform-note" style="display:block">${esc(T[p.noteKey] || '')}</span></span>`;
-    b.addEventListener('click', () => {
+    grid.appendChild(platformCard(p, () => {
       if (p.id === 'youtube') { go('search'); qs('#search-input').focus(); }
       else { go('new'); qs('#new-url').focus(); }
-    });
-    grid.appendChild(b);
+    }));
+  }
+}
+/** Explore block on the Search page: same platforms, routed to the
+ *  listing page - the honest answer to "why does only YouTube search". */
+function renderExploreGrid() {
+  const grid = qs('#explore-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const p of P.PROVIDERS) {
+    grid.appendChild(platformCard(p, () => {
+      if (p.id === 'youtube') { qs('#search-input').focus(); window.scrollTo(0, 0); return; }
+      go('playlists');
+      qs('#pl-url').focus();
+    }));
   }
 }
 function wirePaste(inputSel, tagSel) {
@@ -680,6 +766,26 @@ qs('#home-url').addEventListener('kt-fetch', () => startFetch(qs('#home-url').va
 qs('#new-fetch').addEventListener('click', () => startFetch(qs('#new-url').value));
 qs('#new-url').addEventListener('kt-fetch', () => startFetch(qs('#new-url').value));
 
+function skeletonPreview(mount) {
+  mount.innerHTML = `
+    <div class="preview card" aria-hidden="true">
+      <div class="preview-media"><div class="skl skl-thumb"></div></div>
+      <div class="preview-main">
+        <div class="skl skl-line w70"></div>
+        <div class="skl skl-line w45"></div>
+        <div class="skl skl-line w85"></div>
+        <div class="skl skl-line w55"></div>
+      </div>
+    </div>`;
+}
+function friendlyError(raw) {
+  const m = String(raw || '');
+  if (/blocked-by-user-list/.test(m)) return T.blockedMsg || m;
+  if (/Sign in to confirm|not a bot/i.test(m)) return T.fetchFailed + ' ' + (T.botCheckHint || '');
+  if (/login required|sign in|cookies/i.test(m) && cfg.accountMode === 'off') return T.fetchFailed + ' ' + (T.loginNeededHint || '');
+  return T.fetchFailed + ' — ' + m.slice(0, 160);
+}
+
 async function startFetch(raw) {
   const url = String(raw || '').trim();
   go('new');
@@ -692,18 +798,23 @@ async function startFetch(raw) {
     status.hidden = false; status.className = 'status-line err'; status.textContent = T.invalidUrl;
     return;
   }
+  if (urlBlocked(url)) {
+    status.hidden = false; status.className = 'status-line err'; status.textContent = T.blockedMsg;
+    return;
+  }
   status.hidden = false; status.className = 'status-line'; status.textContent = T.fetchingInfo;
+  skeletonPreview(mount);
   try {
-    const opts = cfg.cookiesBrowser ? { cookiesBrowser: cfg.cookiesBrowser } : null;
+    const opts = accountOpts();
     let info = null;
     try { info = await K.info(url, proxy, opts); } catch (_) { info = null; }
     if (!info) info = await K.playlist(url, proxy, opts);
     status.hidden = true;
     mountPreview(mount, info, url);
   } catch (e) {
+    mount.innerHTML = '';
     status.hidden = false; status.className = 'status-line err';
-    const raw = String(e && e.message || '');
-    status.textContent = T.fetchFailed + (/Sign in to confirm|not a bot/i.test(raw) ? ' ' + (T.botCheckHint || '') : ' — ' + raw.slice(0, 160));
+    status.textContent = friendlyError(e && e.message);
   }
 }
 
@@ -716,8 +827,15 @@ async function runSearch() {
   if (/^https?:\/\//i.test(q)) { startFetch(q); return; }
   status.textContent = T.searching;
   grid.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const sk = document.createElement('div');
+    sk.className = 'vcard';
+    sk.innerHTML = '<div class="vcard-thumb skl"></div><div class="vcard-body"><div class="skl skl-line w85"></div><div class="skl skl-line w55"></div></div>';
+    grid.appendChild(sk);
+  }
   try {
     const items = await K.search(q, proxy);
+    grid.innerHTML = '';
     status.textContent = items.length ? `${items.length} ${T.results}` : (T.searchHint || '');
     for (const it of items) grid.appendChild(searchCard(it));
   } catch (e) {
@@ -733,7 +851,7 @@ function searchCard(it) {
       ${it.isPlaylist ? `<span class="vcard-pl">${esc(T.playlistBadge)}${it.count ? ' · ' + it.count : ''}</span>` : (it.duration ? `<span class="vcard-dur">${fmtDur(it.duration)}</span>` : '')}
     </div>
     <div class="vcard-body">
-      <div class="vcard-title" title="${esc(it.title)}">${esc(it.title)}</div>
+      <div class="vcard-title bidi" dir="auto" title="${esc(it.title)}">${esc(it.title)}</div>
       <div class="vcard-meta">${esc(it.uploader || '')}${it.views ? ' · ' + fmtViews(it.views) + ' ' + esc(T.views) : ''}</div>
       <div class="vcard-actions">
         <button class="btn btn-small btn-primary" data-a="dl">${esc(T.download)}</button>
@@ -758,24 +876,33 @@ qs('#search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') 
 async function loadPlaylist() {
   const url = qs('#pl-url').value.trim();
   const status = qs('#pl-status');
+  const kindLine = qs('#pl-kind');
   const mount = qs('#pl-preview');
   mount.innerHTML = '';
+  kindLine.hidden = true;
   if (!/^https?:\/\//i.test(url)) {
     status.hidden = false; status.className = 'status-line err'; status.textContent = T.invalidUrl;
     return;
   }
+  if (urlBlocked(url)) {
+    status.hidden = false; status.className = 'status-line err'; status.textContent = T.blockedMsg;
+    return;
+  }
+  const kindKey = P.kindOf(url);
+  kindLine.hidden = false;
+  kindLine.textContent = (T.listDetected || '').replace('{kind}', T[kindKey] || '');
   status.hidden = false; status.className = 'status-line'; status.textContent = T.loadingPlaylist;
   try {
-    const info = await K.playlist(url, proxy, null);
+    const info = await K.playlist(url, proxy, accountOpts());
     status.hidden = true;
     mountPlaylist(mount, info, url);
   } catch (e) {
     try {
-      const info = await K.info(url, proxy, null);
+      const info = await K.info(url, proxy, accountOpts());
       status.hidden = true;
       mountPlaylist(mount, info, url);
-    } catch (_) {
-      status.hidden = false; status.className = 'status-line err'; status.textContent = T.fetchFailed;
+    } catch (e2) {
+      status.hidden = false; status.className = 'status-line err'; status.textContent = friendlyError(e2 && e2.message);
     }
   }
 }
@@ -805,7 +932,7 @@ function renderLibrary() {
     el.className = 'row-item';
     el.innerHTML = `
       <div class="row-main">
-        <div class="row-title" title="${esc(f.path)}">${esc(f.name)}</div>
+        <div class="row-title bidi" dir="auto" title="${esc(f.path)}">${esc(f.name)}</div>
         <div class="row-meta">
           <span class="kind-badge">${esc(f.kind === 'video' ? T.typeVideo : f.kind === 'audio' ? T.typeAudio : T.typeImage)}</span>
           <span>${esc(fmtBytes(f.size / 1024))}</span>
@@ -838,6 +965,14 @@ qsAll('#lib-filter .seg-btn').forEach((b) => b.addEventListener('click', () => {
 }));
 
 /* ------------------------------------------------------ settings ------ */
+function renderAccountRows() {
+  qs('#s-account-browser-row').hidden = cfg.accountMode !== 'browser';
+  qs('#s-account-file-row').hidden = cfg.accountMode !== 'file';
+  qs('#s-cookies-path').textContent = cfg.cookiesFile
+    ? cfg.cookiesFile.split(/[\\/]/).pop()
+    : (T.accountFileNone || '');
+  qs('#s-cookies-path').title = cfg.cookiesFile || '';
+}
 async function loadSettingsIntoForm() {
   qs('#s-concurrency').value = cfg.concurrency;
   qs('#s-ratelimit').value = cfg.rateLimitKb;
@@ -845,7 +980,12 @@ async function loadSettingsIntoForm() {
   qs('#s-subsmode').value = cfg.subsMode;
   qs('#s-thumbmode').value = cfg.thumbMode;
   qs('#s-sublang').value = cfg.defaultSubLang;
-  qs('#s-cookies').value = cfg.cookiesBrowser;
+  qs('#s-account-mode').value = cfg.accountMode;
+  qs('#s-account-browser').value = cfg.accountBrowser;
+  qs('#s-blockadult').checked = cfg.blockAdult !== false;
+  qs('#s-blocked').value = cfg.blockedExtra || '';
+  qs('#s-blocked').placeholder = T.blockedPh || '';
+  renderAccountRows();
   qs('#s-dir-path').textContent = downloadsDir;
   qs('#dir-path').textContent = downloadsDir;
   try { qs('#s-tunnelmode').value = await K.tunnelModeGet(); } catch (_) { /* default */ }
@@ -865,10 +1005,28 @@ bindSetting('#s-ratelimit', 'rateLimitKb', (v) => Math.max(0, parseInt(v, 10) ||
 bindSetting('#s-subsmode', 'subsMode');
 bindSetting('#s-thumbmode', 'thumbMode');
 bindSetting('#s-sublang', 'defaultSubLang');
-bindSetting('#s-cookies', 'cookiesBrowser');
+bindSetting('#s-account-mode', 'accountMode');
+qs('#s-account-mode').addEventListener('change', renderAccountRows);
+bindSetting('#s-account-browser', 'accountBrowser');
+qs('#s-cookies-pick').addEventListener('click', async () => {
+  const f = await K.pickCookiesFile();
+  if (f) {
+    cfg.cookiesFile = f;
+    await K.settingSet('cookiesFile', f);
+    renderAccountRows();
+  }
+});
+qs('#s-blockadult').addEventListener('change', async (e) => {
+  cfg.blockAdult = e.target.checked;
+  await K.settingSet('blockAdult', cfg.blockAdult);
+});
+qs('#s-blocked').addEventListener('change', async (e) => {
+  cfg.blockedExtra = e.target.value;
+  await K.settingSet('blockedExtra', cfg.blockedExtra);
+});
 qs('#s-lang').addEventListener('change', async (e) => {
   const r = await K.langSet(e.target.value);
-  if (r && r.strings) { LANG = r.language; T = r.strings; applyStrings(); }
+  if (r && r.strings) { LANG = r.language; RTL = !!r.rtl; T = r.strings; applyStrings(); }
 });
 qs('#s-tunnelmode').addEventListener('change', async (e) => { await K.tunnelModeSet(e.target.value); });
 qs('#s-reset').addEventListener('click', async () => {
@@ -892,9 +1050,9 @@ qsAll('#theme-seg .seg-btn').forEach((b) => b.addEventListener('click', () => se
 qsAll('#lang-seg .seg-btn').forEach((b) => b.addEventListener('click', async () => {
   if (b.dataset.langPick === LANG) return;
   const r = await K.langSet(b.dataset.langPick);
-  if (r && r.strings) { LANG = r.language; T = r.strings; applyStrings(); applyTheme(); }
+  if (r && r.strings) { LANG = r.language; RTL = !!r.rtl; T = r.strings; applyStrings(); applyTheme(); }
 }));
-K.onLang(({ language, strings }) => { LANG = language; T = strings; applyStrings(); });
+K.onLang(({ language, strings, rtl }) => { LANG = language; RTL = !!rtl; T = strings; applyStrings(); });
 
 /* ---------------------------------------------------------- versions -- */
 async function loadVersions() {
@@ -912,11 +1070,18 @@ async function loadVersions() {
 (async function boot() {
   const lg = await K.langGet();
   LANG = lg.language || 'fa';
+  RTL = !!lg.rtl;
   T = lg.strings || {};
   cfg.theme = (await K.themeGet().catch(() => 'dark')) || 'dark';
-  for (const key of ['defaultQuality', 'concurrency', 'rateLimitKb', 'subsMode', 'thumbMode', 'defaultSubLang', 'cookiesBrowser']) {
+  for (const key of ['defaultQuality', 'concurrency', 'rateLimitKb', 'subsMode', 'thumbMode', 'defaultSubLang', 'accountMode', 'accountBrowser', 'cookiesFile', 'blockAdult', 'blockedExtra']) {
     const v = await K.settingGet(key).catch(() => null);
     if (v !== null && v !== undefined) cfg[key] = v;
+  }
+  // migrate the v3.0 browser-session setting into the account model
+  const legacy = await K.settingGet('cookiesBrowser').catch(() => null);
+  if (legacy && cfg.accountMode === 'off') {
+    cfg.accountMode = 'browser';
+    cfg.accountBrowser = legacy;
   }
   downloadsDir = await K.getDownloads().catch(() => '');
   applyTheme();

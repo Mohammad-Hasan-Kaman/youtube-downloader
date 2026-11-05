@@ -65,6 +65,10 @@
             <button class="seg-btn" data-lang-pick="fa">فا</button>
             <button class="seg-btn" data-lang-pick="en">EN</button>
             <button class="seg-btn" data-lang-pick="de">DE</button>
+            <button class="seg-btn" data-lang-pick="ar">ع</button>
+            <button class="seg-btn" data-lang-pick="es">ES</button>
+            <button class="seg-btn" data-lang-pick="ru">RU</button>
+            <button class="seg-btn" data-lang-pick="zh">中文</button>
           </div>
         </div>
       </header>
@@ -96,6 +100,11 @@
           </div>
           <p class="page-sub" id="search-status" data-i18n="searchHint"></p>
           <div class="cards" id="search-results"></div>
+          <div id="explore-wrap">
+            <h3 class="section-h" data-i18n="exploreTitle"></h3>
+            <p class="page-sub" data-i18n="exploreSub"></p>
+            <div class="platform-grid" id="explore-grid"></div>
+          </div>
         </section>
 
         <!-- ======== NEW DOWNLOAD ======== -->
@@ -118,6 +127,7 @@
             <button class="btn btn-primary" id="pl-load" data-i18n="loadPlaylist"></button>
           </div>
           <div class="status-line" id="pl-status" hidden></div>
+          <div class="kind-line" id="pl-kind" hidden></div>
           <div id="pl-preview"></div>
           <div id="pl-jobs"></div>
         </section>
@@ -173,6 +183,10 @@
                   <option value="fa" data-i18n="langFa"></option>
                   <option value="en" data-i18n="langEn"></option>
                   <option value="de" data-i18n="langDe"></option>
+                  <option value="ar" data-i18n="langAr"></option>
+                  <option value="es" data-i18n="langEs"></option>
+                  <option value="ru" data-i18n="langRu"></option>
+                  <option value="zh" data-i18n="langZh"></option>
                 </select>
               </label>
               <label class="field"><span data-i18n="theme"></span>
@@ -238,16 +252,43 @@
                 </select>
               </label>
               <p class="note" data-i18n="tunnelNote"></p>
-              <label class="field"><span data-i18n="cookiesTitle"></span>
-                <select id="s-cookies">
-                  <option value="" data-i18n="cookiesOff"></option>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend data-i18n="secAccount"></legend>
+              <label class="field"><span data-i18n="accountMode"></span>
+                <select id="s-account-mode">
+                  <option value="off" data-i18n="accountOff"></option>
+                  <option value="browser" data-i18n="accountBrowserOpt"></option>
+                  <option value="file" data-i18n="accountFileOpt"></option>
+                </select>
+              </label>
+              <label class="field" id="s-account-browser-row" hidden><span data-i18n="accountBrowserOpt"></span>
+                <select id="s-account-browser">
                   <option value="chrome">Chrome</option>
                   <option value="edge">Edge</option>
                   <option value="firefox">Firefox</option>
                   <option value="brave">Brave</option>
                 </select>
               </label>
-              <p class="note" data-i18n="cookiesNote"></p>
+              <div class="field" id="s-account-file-row" hidden><span data-i18n="accountFileOpt"></span>
+                <span class="dir-inline"><span class="dir-path" id="s-cookies-path"></span>
+                <button class="btn btn-small" id="s-cookies-pick" data-i18n="accountFilePick"></button></span>
+                <p class="note" data-i18n="accountFileHint"></p>
+              </div>
+              <p class="note" data-i18n="accountNote"></p>
+            </fieldset>
+
+            <fieldset class="card">
+              <legend data-i18n="secSafety"></legend>
+              <label class="check-field">
+                <input type="checkbox" id="s-blockadult" />
+                <span data-i18n="blockAdult"></span>
+              </label>
+              <p class="note" data-i18n="blockAdultNote"></p>
+              <label class="field"><span data-i18n="blockedExtra"></span>
+                <textarea id="s-blocked" rows="3" spellcheck="false"></textarea>
+              </label>
             </fieldset>
 
             <fieldset class="card">

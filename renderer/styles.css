@@ -179,11 +179,12 @@ html[dir="rtl"] .nav-btn.active { box-shadow: inset -3px 0 0 var(--accent); }
 .icon-btn:hover { background: var(--hover); color: var(--text); border-color: var(--border); }
 .icon-btn svg { width: 15px; height: 15px; }
 
-.url-input, input[type="text"], input[type="number"], select {
+.url-input, input[type="text"], input[type="number"], select, textarea {
   background: var(--input-bg); border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13.5px;
   outline: none; min-width: 0;
 }
+textarea { font-family: var(--font-mono); font-size: 12.5px; direction: ltr; text-align: left; resize: vertical; width: 100%; }
 .url-input:focus, input:focus, select:focus { border-color: var(--accent); }
 .url-input { direction: ltr; text-align: left; }
 .paste-box { display: flex; gap: 9px; align-items: center; }
@@ -323,6 +324,37 @@ fieldset.card legend { font-weight: 700; font-size: 13.5px; padding: 0 6px; }
 .about-text { margin-top: 14px; color: var(--text); }
 .repo-link { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
 .repo-link:hover { text-decoration: underline; }
+
+/* ---------------- Bidi, chips, skeletons, motion ---------------- */
+/* Mixed-direction content (a Persian UI showing an English title, or
+   the reverse) must keep its own direction per line of text. */
+.bidi { unicode-bidi: plaintext; text-align: start; }
+.platform-body { display: block; min-width: 0; }
+.feat-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.chip {
+  font-size: 10.5px; font-weight: 600; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 20px; padding: 1px 8px;
+  background: var(--bg);
+}
+.warn-line { margin: 4px 0 2px; border-color: var(--accent); color: var(--text); }
+.kind-line { margin-top: 10px; font-size: 12.5px; color: var(--text-dim); }
+.check-field { display: flex; align-items: center; gap: 9px; font-size: 13px; margin-bottom: 4px; cursor: pointer; }
+.check-field input { width: 16px; height: 16px; accent-color: var(--accent); }
+.skl { background: var(--bg-inset); border-radius: var(--radius-sm); animation: sklpulse 1.05s ease-in-out infinite alternate; }
+.skl-thumb { width: 340px; max-width: 100%; aspect-ratio: 16/9; }
+.skl-line { height: 13px; margin-bottom: 12px; }
+.skl-line.w45 { width: 45%; } .skl-line.w55 { width: 55%; }
+.skl-line.w70 { width: 70%; } .skl-line.w85 { width: 85%; }
+@keyframes sklpulse { from { opacity: .45; } to { opacity: .9; } }
+.btn { transition: background .12s ease, border-color .12s ease, transform .06s ease; }
+.btn:active { transform: translateY(1px); }
+.platform-card, .vcard, .row-item { transition: border-color .15s ease, background .15s ease; }
+.toast { animation: toastin .18s ease; }
+@keyframes toastin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .page.active, .toast, .skl { animation: none; }
+  .bar-fill { transition: none; }
+}
 
 /* ---------------- Toasts & scrollbars ---------------- */
 .toasts { position: fixed; bottom: 18px; inset-inline-end: 18px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
