@@ -9,9 +9,10 @@
 
 const STRINGS = {
   fa: {
-    cookiesTitle: 'ورود به اینستاگرام (اختیاری)',
+    botCheckHint: 'سایت بررسی رباتی نشان داد. در تنظیمات ← شبکه، «ورود با مرورگر خودتان» را فعال کنید یا چند دقیقه بعد دوباره تلاش کنید.',
+    cookiesTitle: 'ورود با مرورگر خودتان (اختیاری)',
     cookiesOff: 'استفاده نمی‌شود (فقط محتوای عمومی)',
-    cookiesNote: 'اگر محتوای اینستاگرام بدون ورود در دسترس نبود، برنامه می‌تواند نشست واردشده خودتان را از مرورگرتان بخواند. این گزینه پیش‌فرض خاموش است؛ هیچ کوکی‌ای ذخیره یا در گزارش‌ها ثبت نمی‌شود.',
+    cookiesNote: 'بعضی سایت‌ها (یوتیوب و اینستاگرام) برای بازدیدهای بدون ورود خطای بررسی رباتی می‌دهند. با این گزینه، برنامه نشست واردشده خودتان را از مرورگرتان می‌خواند. پیش‌فرض خاموش است؛ هیچ کوکی‌ای ذخیره یا در گزارش‌ها ثبت نمی‌شود.',
     appName: 'KamanTube',
     tagline: 'دانلودر رسانه‌ای چندسکویی',
     groupMain: 'اصلی',
@@ -176,9 +177,10 @@ const STRINGS = {
     fromPlatform: 'پلتفرم',
   },
   en: {
-    cookiesTitle: 'Instagram sign-in (optional)',
+    botCheckHint: 'The site showed a bot check. Enable “Sign in with your browser” in Settings → Network, or try again in a few minutes.',
+    cookiesTitle: 'Sign in with your browser (optional)',
     cookiesOff: 'Not used (public content only)',
-    cookiesNote: 'If Instagram content is unavailable signed-out, the app can read your own signed-in session from your browser. Off by default; no cookie is ever stored or logged.',
+    cookiesNote: 'Some sites (YouTube, Instagram) show a bot check to signed-out visitors. With this option the app reads your own signed-in session from your browser. Off by default; no cookie is ever stored or logged.',
     appName: 'KamanTube',
     tagline: 'Universal media downloader',
     groupMain: 'Main',
@@ -343,9 +345,10 @@ const STRINGS = {
     fromPlatform: 'Platform',
   },
   de: {
-    cookiesTitle: 'Instagram-Anmeldung (optional)',
+    botCheckHint: 'Die Seite zeigte eine Bot-Prüfung. Aktivieren Sie „Anmeldung über Ihren Browser“ in Einstellungen → Netzwerk oder versuchen Sie es in einigen Minuten erneut.',
+    cookiesTitle: 'Anmeldung über Ihren Browser (optional)',
     cookiesOff: 'Nicht verwendet (nur öffentliche Inhalte)',
-    cookiesNote: 'Falls Instagram-Inhalte ohne Anmeldung nicht verfügbar sind, kann die App Ihre eigene Sitzung aus Ihrem Browser lesen. Standardmäßig aus; Cookies werden nie gespeichert oder protokolliert.',
+    cookiesNote: 'Manche Seiten (YouTube, Instagram) zeigen abgemeldeten Besuchern eine Bot-Prüfung. Mit dieser Option liest die App Ihre eigene Sitzung aus Ihrem Browser. Standardmäßig aus; Cookies werden nie gespeichert oder protokolliert.',
     appName: 'KamanTube',
     tagline: 'Universeller Medien-Downloader',
     groupMain: 'Hauptbereich',

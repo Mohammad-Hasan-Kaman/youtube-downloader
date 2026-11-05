@@ -12,20 +12,27 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const zlib = require('zlib');
 
+// curl.exe is used for everything (it honours the proxy env vars that
+// restricted networks need; Node's fetch does not).
+const PROXY = process.env.https_proxy || process.env.HTTPS_PROXY || '';
+function curlArgs(extra) {
+  return ['-sSL', '--retry', '5', '--retry-all-errors', ...(PROXY ? ['-x', PROXY] : []), ...extra];
+}
+
 function dl(url, dest) {
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   console.log('downloading', url);
-  execFileSync('curl.exe', ['-sSL', '--retry', '3', '--max-time', '600', '-o', dest, url], { stdio: 'inherit' });
+  execFileSync('curl.exe', curlArgs(['--max-time', '900', '-C', '-', '-o', dest, url]), { stdio: 'inherit' });
 }
 
 async function ghAsset(repo, asset) {
-  // resolve latest release asset URL via GitHub API
-  const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
-    headers: { 'User-Agent': 'KamanTube' },
-  });
-  if (!res.ok) throw new Error(`GitHub API ${res.status} for ${repo}`);
-  const rel = await res.json();
-  const a = rel.assets.find((x) => x.name === asset);
+  // resolve latest release asset URL via GitHub API (through curl)
+  const out = execFileSync('curl.exe', curlArgs([
+    '-H', 'User-Agent: KamanTube',
+    `https://api.github.com/repos/${repo}/releases/latest`,
+  ]), { maxBuffer: 16 * 1024 * 1024 }).toString();
+  const rel = JSON.parse(out);
+  const a = (rel.assets || []).find((x) => x.name === asset);
   if (!a) throw new Error(`asset ${asset} not found in ${repo} latest`);
   return a.browser_download_url;
 }
@@ -68,10 +75,12 @@ async function main() {
   // 3) ffmpeg essentials (just the two exe files) - asset names are versioned,
   //    so pick the one matching ..._essentials_build.zip from the latest release
   const ffRepo = 'GyanD/codexffmpeg';
-  const res = await fetch(`https://api.github.com/repos/${ffRepo}/releases/latest`, { headers: { 'User-Agent': 'KamanTube' } });
-  if (!res.ok) throw new Error(`GitHub API ${res.status} for ${ffRepo}`);
-  const rl = await res.json();
-  const ffA = rl.assets.find((x) => /essentials_build\.zip$/.test(x.name));
+  const rlOut = execFileSync('curl.exe', curlArgs([
+    '-H', 'User-Agent: KamanTube',
+    `https://api.github.com/repos/${ffRepo}/releases/latest`,
+  ]), { maxBuffer: 16 * 1024 * 1024 }).toString();
+  const rl = JSON.parse(rlOut);
+  const ffA = (rl.assets || []).find((x) => /essentials_build\.zip$/.test(x.name));
   if (!ffA) throw new Error(`essentials_build.zip not found in ${ffRepo} latest`);
   const ffUrl = ffA.browser_download_url;
   const fz = path.join(tmp, 'ffmpeg.zip');

@@ -262,7 +262,7 @@ async function pump() {
         subLang: j.subLang || undefined,
         subsMode: j.subsMode, thumbMode: j.thumbMode,
         rateLimitKb: j.rateLimitKb || 0,
-        cookiesBrowser: j.platform === 'instagram' ? (j.cookiesBrowser || undefined) : undefined,
+        cookiesBrowser: j.cookiesBrowser || undefined,
         outDir: j.outDir || downloadsDir,
       }, proxy);
       if (realId && realId !== j.id) { /* engine honours our id */ }
@@ -310,7 +310,10 @@ K.onYtEvent((e) => {
   }
   if (e.type === 'error') {
     if (j.status === 'paused') return;
-    j.status = 'failed'; j.error = String(e.message || '').slice(0, 240);
+    j.status = 'failed';
+    j.error = /Sign in to confirm|not a bot/i.test(String(e.message || ''))
+      ? (T.botCheckHint || String(e.message).slice(0, 240))
+      : String(e.message || '').slice(0, 240);
     paintJob(j); pushHistory(j); toast(T.downloadFailed, true);
     persistQueue(); pump(); updateOverall();
   }
@@ -681,7 +684,7 @@ async function startFetch(raw) {
   }
   status.hidden = false; status.className = 'status-line'; status.textContent = T.fetchingInfo;
   try {
-    const opts = (P.detect(url) === 'instagram' && cfg.cookiesBrowser) ? { cookiesBrowser: cfg.cookiesBrowser } : null;
+    const opts = cfg.cookiesBrowser ? { cookiesBrowser: cfg.cookiesBrowser } : null;
     let info = null;
     try { info = await K.info(url, proxy, opts); } catch (_) { info = null; }
     if (!info) info = await K.playlist(url, proxy, opts);
@@ -689,7 +692,8 @@ async function startFetch(raw) {
     mountPreview(mount, info, url);
   } catch (e) {
     status.hidden = false; status.className = 'status-line err';
-    status.textContent = T.fetchFailed + ' — ' + String(e && e.message || '').slice(0, 160);
+    const raw = String(e && e.message || '');
+    status.textContent = T.fetchFailed + (/Sign in to confirm|not a bot/i.test(raw) ? ' ' + (T.botCheckHint || '') : ' — ' + raw.slice(0, 160));
   }
 }
 
