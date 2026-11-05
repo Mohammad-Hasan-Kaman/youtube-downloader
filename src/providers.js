@@ -22,6 +22,7 @@ const PROVIDERS = [
     nameKey: 'platformYouTube',
     noteKey: 'noteYouTube',
     hosts: ['youtube.com', 'youtu.be', 'music.youtube.com', 'youtube-nocookie.com'],
+    features: ['featSearch', 'featPlaylists', 'featChannels', 'featSubtitles', 'featQualities', 'featAudio'],
     capabilities: {
       search: true, playlists: true, subtitles: true, thumbnail: true,
       qualities: true, audioExtract: true, collections: true,
@@ -33,9 +34,10 @@ const PROVIDERS = [
     noteKey: 'notePinterest',
     hosts: ['pinterest.com', 'pin.it'],
     hostPattern: /(^|\.)pinterest\.[a-z.]+$/,
+    features: ['featBoards', 'featImages', 'featQualities', 'featChannels'],
     capabilities: {
-      search: false, playlists: false, subtitles: false, thumbnail: true,
-      qualities: false, audioExtract: false, collections: true, images: true,
+      search: false, playlists: true, subtitles: false, thumbnail: true,
+      qualities: true, audioExtract: false, collections: true, images: true,
     },
   },
   {
@@ -43,8 +45,9 @@ const PROVIDERS = [
     nameKey: 'platformInstagram',
     noteKey: 'noteInstagram',
     hosts: ['instagram.com'],
+    features: ['featCarousel', 'featImages', 'featStories', 'featLogin'],
     capabilities: {
-      search: false, playlists: false, subtitles: false, thumbnail: true,
+      search: false, playlists: true, subtitles: false, thumbnail: true,
       qualities: false, audioExtract: false, collections: true, images: true,
       loginMayBeRequired: true,
     },
@@ -54,9 +57,10 @@ const PROVIDERS = [
     nameKey: 'platformTikTok',
     noteKey: 'noteTikTok',
     hosts: ['tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'],
+    features: ['featChannels', 'featQualities', 'featAudio', 'featImages'],
     capabilities: {
-      search: false, playlists: false, subtitles: false, thumbnail: true,
-      qualities: false, audioExtract: true, collections: false, images: true,
+      search: false, playlists: true, subtitles: false, thumbnail: true,
+      qualities: true, audioExtract: true, collections: true, images: true,
     },
   },
   {
@@ -64,8 +68,9 @@ const PROVIDERS = [
     nameKey: 'platformX',
     noteKey: 'noteX',
     hosts: ['x.com', 'twitter.com'],
+    features: ['featChannels', 'featQualities', 'featAudio', 'featImages'],
     capabilities: {
-      search: false, playlists: false, subtitles: false, thumbnail: true,
+      search: false, playlists: true, subtitles: false, thumbnail: true,
       qualities: true, audioExtract: true, collections: true, images: true,
     },
   },
@@ -76,6 +81,7 @@ const FALLBACK = {
   nameKey: 'platformWeb',
   noteKey: 'noteWeb',
   hosts: [],
+  features: ['featQualities', 'featPlaylists', 'featAudio'],
   capabilities: {
     search: false, playlists: true, subtitles: true, thumbnail: true,
     qualities: true, audioExtract: true, collections: true, images: true,
@@ -108,6 +114,71 @@ function getCapabilities(id) {
   return getProvider(id).capabilities;
 }
 
-const api = { PROVIDERS, FALLBACK, detect, getProvider, getCapabilities, canHandle, hostOf };
+/**
+ * What kind of listing a URL points at, for the Playlists & Profiles
+ * page: a real playlist, a channel, a user profile, or a board.
+ * Returns an i18n key (kindPlaylist / kindChannel / kindProfile / kindBoard).
+ */
+function kindOf(url) {
+  const id = detect(url);
+  let path = '';
+  try { path = new URL(String(url)).pathname; } catch (_) { return 'kindPlaylist'; }
+  if (id === 'youtube') {
+    if (/[?&]list=/.test(String(url)) || /\/playlist/.test(path)) return 'kindPlaylist';
+    if (/^\/(channel|c|user|@)/.test(path)) return 'kindChannel';
+    return 'kindPlaylist';
+  }
+  if (id === 'pinterest') {
+    if (/\/pin\//.test(path)) return 'kindProfile'; // single pin, not a listing
+    const seg = path.split('/').filter(Boolean);
+    return seg.length >= 2 ? 'kindBoard' : 'kindProfile';
+  }
+  if (id === 'instagram' || id === 'tiktok' || id === 'x') return 'kindProfile';
+  return 'kindPlaylist';
+}
+
+/* ---------------------------------------------------------- blocking -- */
+/**
+ * Built-in adult-site blocklist (hostnames; subdomains included).
+ * The user explicitly asked that downloads from such platforms are
+ * refused. Enforced in the main process for every info/playlist/
+ * download call, and pre-checked in the renderer for instant feedback.
+ * The user can extend it with extra domains and can switch the
+ * built-in list off in Settings - but it ships ON.
+ */
+const ADULT_HOSTS = [
+  'pornhub.com', 'xvideos.com', 'xnxx.com', 'xhamster.com', 'redtube.com',
+  'youporn.com', 'brazzers.com', 'onlyfans.com', 'chaturbate.com',
+  'livejasmin.com', 'stripchat.com', 'bongacams.com', 'myfreecams.com',
+  'spankbang.com', 'eporner.com', 'porntrex.com', 'faphouse.com',
+  'rule34.xxx', 'hentaihaven.xxx', 'hanime.tv',
+];
+
+function hostBlocked(host, list) {
+  if (!host) return false;
+  return list.some((d) => host === d || host.endsWith('.' + d));
+}
+
+function parseBlockedExtra(text) {
+  return String(text || '')
+    .split(/[\s,;]+/)
+    .map((s) => s.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
+    .filter(Boolean);
+}
+
+/** opts: { adult: boolean, extra: string|string[] } */
+function isBlocked(url, opts) {
+  const host = hostOf(url);
+  if (!host) return false;
+  const o = opts || {};
+  if (o.adult !== false && hostBlocked(host, ADULT_HOSTS)) return true;
+  const extra = Array.isArray(o.extra) ? o.extra : parseBlockedExtra(o.extra);
+  return hostBlocked(host, extra);
+}
+
+const api = {
+  PROVIDERS, FALLBACK, detect, getProvider, getCapabilities, canHandle, hostOf,
+  kindOf, ADULT_HOSTS, isBlocked, parseBlockedExtra,
+};
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.KamanProviders = api;

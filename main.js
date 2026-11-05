@@ -10,7 +10,8 @@ const fs = require('fs');
 
 const { SmartRoutingManager } = require('./src/routing');
 const { YtdlpService } = require('./src/yt');
-const { getI18n } = require('./src/i18n');
+const { getI18n, isRtl } = require('./src/i18n');
+const providers = require('./src/providers');
 const state = require('./src/state');
 
 let win = null;
@@ -149,11 +150,13 @@ function createWindow(isDev) {
 ipcMain.handle('lang:get', () => ({
   language: state.get('language', 'fa'),
   strings: getI18n(state.get('language', 'fa')),
+  rtl: isRtl(state.get('language', 'fa')),
 }));
 ipcMain.handle('lang:set', (_e, lang) => {
   state.set('language', lang);
-  if (win) win.webContents.send('lang:updated', { language: lang, strings: getI18n(lang) });
-  return { language: lang, strings: getI18n(lang) };
+  const payload = { language: lang, strings: getI18n(lang), rtl: isRtl(lang) };
+  if (win) win.webContents.send('lang:updated', payload);
+  return payload;
 });
 
 // Settings
@@ -212,19 +215,34 @@ async function withRouteFallback(fn) {
   }
   throw lastErr || new Error('request failed');
 }
+// Site blocking (user-configured): the built-in adult list ships ON,
+// plus any extra domains the user adds. Enforced here so no code path
+// in the renderer can bypass it.
+function assertNotBlocked(url) {
+  const adult = state.get('blockAdult', null) !== false; // default ON
+  const extra = state.get('blockedExtra', '') || '';
+  if (providers.isBlocked(url, { adult, extra })) {
+    throw new Error('blocked-by-user-list');
+  }
+}
 ipcMain.handle('yt:search', async (_e, q, proxy) => {
   if (proxy) return yt.search(q, withProxy(proxy));
   return withRouteFallback((p) => yt.search(q, p));
 });
 ipcMain.handle('yt:info', async (_e, url, proxy, opts) => {
+  assertNotBlocked(url);
   if (proxy) return yt.info(url, withProxy(proxy), opts || null);
   return withRouteFallback((p) => yt.info(url, p, opts || null));
 });
 ipcMain.handle('yt:playlist', async (_e, url, proxy, opts) => {
+  assertNotBlocked(url);
   if (proxy) return yt.playlist(url, withProxy(proxy), opts || null);
   return withRouteFallback((p) => yt.playlist(url, p, opts || null));
 });
-ipcMain.handle('yt:download', async (_e, job, proxy) => yt.download(job, withProxy(proxy)));
+ipcMain.handle('yt:download', async (_e, job, proxy) => {
+  assertNotBlocked(job && job.url);
+  return yt.download(job, withProxy(proxy));
+});
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));
 
 // Paths
@@ -239,6 +257,14 @@ ipcMain.handle('paths:pick', async () => {
   const d = r.filePaths[0];
   state.set('downloadDir', d);
   return d;
+});
+ipcMain.handle('paths:pickFile', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    properties: ['openFile'],
+    filters: [{ name: 'Cookies', extensions: ['txt'] }, { name: 'All files', extensions: ['*'] }],
+  });
+  if (r.canceled) return null;
+  return r.filePaths[0];
 });
 ipcMain.handle('paths:open', async (_e, p) => {
   if (!p || typeof p !== 'string') return false;

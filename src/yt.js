@@ -62,8 +62,11 @@ class YtdlpService extends EventEmitter {
       '--skip-download',
       ...(extra || []),
       ...(proxy ? ['--proxy', proxy] : []),
-      // Optional, explicit user opt-in only: read the signed-in session from
-      // the user's own browser (e.g. Instagram). Never stored, never logged.
+      // Optional, explicit user opt-in only: use the signed-in session from
+      // the user's own browser or their own cookies.txt file (account
+      // access). The app never asks for or stores a password; cookie
+      // values are never logged.
+      ...(opts && opts.cookiesFile ? ['--cookies', String(opts.cookiesFile)] : []),
       ...(opts && opts.cookiesBrowser ? ['--cookies-from-browser', String(opts.cookiesBrowser)] : []),
     ];
   }
@@ -139,7 +142,38 @@ class YtdlpService extends EventEmitter {
   }
 
   _videoShape(o) {
-    const formats = (o.formats || []).filter((f) => f.vcodec && f.vcodec !== 'none' && f.height);
+    const allFormats = o.formats || [];
+    const formats = allFormats.filter((f) => f.vcodec && f.vcodec !== 'none' && f.height);
+
+    // Image-only media (e.g. a Pinterest image pin): no video streams,
+    // but a downloadable image format exists.
+    if (!formats.length) {
+      const img = allFormats.find((f) => (!f.vcodec || f.vcodec === 'none')
+        && (!f.acodec || f.acodec === 'none')
+        && /^(jpe?g|png|webp|gif|avif)$/i.test(f.ext || ''));
+      if (img) {
+        return {
+          type: 'image',
+          id: o.id,
+          url: o.webpage_url || o.original_url || '',
+          title: o.title || '',
+          uploader: o.uploader || o.channel || '',
+          views: o.view_count || 0,
+          duration: 0,
+          thumb: o.thumbnail || img.url || '',
+          uploadDate: o.upload_date || '',
+          description: (o.description || '').slice(0, 1200),
+          subtitles: [],
+          qualities: [],
+          audio: null,
+          image: {
+            formatId: img.format_id, ext: img.ext || 'jpg',
+            width: img.width || 0, height: img.height || 0,
+            size: img.filesize || img.filesize_approx || 0,
+          },
+        };
+      }
+    }
 
     // best variant per height: prefer muxed (has audio), then highest bitrate
     const byHeight = {};
@@ -227,10 +261,13 @@ class YtdlpService extends EventEmitter {
       ...(this.ffmpegDir() ? ['--ffmpeg-location', this.ffmpegDir()] : []),
       ...(proxy ? ['--proxy', proxy] : []),
       ...(job.rateLimitKb && job.rateLimitKb > 0 ? ['--limit-rate', `${job.rateLimitKb}K`] : []),
+      ...(job.cookiesFile ? ['--cookies', String(job.cookiesFile)] : []),
       ...(job.cookiesBrowser ? ['--cookies-from-browser', String(job.cookiesBrowser)] : []),
     ];
 
-    if (isAudio) {
+    if (job.kind === 'image') {
+      args.push('-f', job.formatId && job.formatId !== 'best' ? String(job.formatId) : 'best');
+    } else if (isAudio) {
       args.push('-f', 'bestaudio[ext=m4a]/bestaudio/best',
         '--extract-audio', '--audio-format', 'm4a',
         '--audio-quality', '0', '-x');
@@ -242,7 +279,7 @@ class YtdlpService extends EventEmitter {
     }
 
     // Subtitles: embedded into the container, a separate .srt, or skipped.
-    if (job.subLang && subsMode !== 'disabled') {
+    if (job.kind !== 'image' && job.subLang && subsMode !== 'disabled') {
       if (subsMode === 'separate') {
         args.push('--write-sub', '--sub-langs', job.subLang, '--convert-subs', 'srt');
       } else {
@@ -250,7 +287,9 @@ class YtdlpService extends EventEmitter {
       }
     }
     // Thumbnail: embedded into the media file or saved next to it.
-    if (thumbMode === 'separate') {
+    if (job.kind === 'image') {
+      // the file IS the image - no thumbnail handling
+    } else if (thumbMode === 'separate') {
       args.push('--write-thumbnail');
     } else if (thumbMode === 'embedded') {
       args.push('--embed-thumbnail');
@@ -306,16 +345,20 @@ class YtdlpService extends EventEmitter {
       }
     });
 
+    let lastError = '';
     child.stderr.on('data', (chunk) => {
       lastActivity = Date.now();
       const t = chunk.toString();
+      for (const line of t.split('\n')) {
+        if (/ERROR/i.test(line)) lastError = line.trim().slice(0, 240);
+      }
       if (t.trim()) send({ type: 'log', message: t.trim().slice(0, 300) });
     });
 
     child.on('close', (code) => {
       this._jobs.delete(id);
       if (code === 0) send({ type: 'done', title: job.title });
-      else send({ type: 'error', message: `exited with code ${code}` });
+      else send({ type: 'error', message: lastError || `exited with code ${code}` });
     });
 
     return id;

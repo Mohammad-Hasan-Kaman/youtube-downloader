@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('kaman', {
   // paths
   getDownloads: () => ipcRenderer.invoke('paths:downloads'),
   pickDir: () => ipcRenderer.invoke('paths:pick'),
+  pickCookiesFile: () => ipcRenderer.invoke('paths:pickFile'),
   openFolder: (p) => ipcRenderer.invoke('paths:open', p),
 
   // settings
