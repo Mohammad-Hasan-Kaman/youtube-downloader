@@ -53,10 +53,20 @@ that had been validated on real networks was kept and extended.
   component versions and a live connection log.
 - **Media Library page**: browse, open, reveal and delete downloaded
   files (deletion is restricted to the downloads folder).
+- **Automatic captions**: auto-generated caption languages are listed
+  in the download preview next to the manual subtitle tracks, labelled
+  as automatic, and are fetched with yt-dlp's `--write-auto-subs`. A
+  language that has a real manual track keeps using it.
+- **Queue priority**: pending downloads can be raised or lowered with
+  the arrow buttons on their queue row. When a slot frees, the
+  highest-priority job starts next (insertion order breaks ties);
+  priority is saved with the queue and survives a restart. With no
+  reordering, the queue behaves exactly as the previous FIFO.
 - **Unit tests** (`test/`, Node's built-in runner): provider URL
   detection, blocklist matching, i18n key symmetry and placeholder
-  parity across all seven languages, RTL set, and the yt-dlp info-shape
-  mapping.
+  parity across all seven languages, RTL set, the yt-dlp info-shape
+  mapping, subtitle argument construction (manual vs auto-generated
+  captions), and queue priority selection.
 - Full documentation set: README rewrite, CONTRIBUTING,
   CODE_OF_CONDUCT, SECURITY, NOTICE.
 
