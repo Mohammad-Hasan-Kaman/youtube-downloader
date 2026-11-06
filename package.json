@@ -9,6 +9,7 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
+    "test": "node --test \"test/**/*.test.js\"",
     "dist": "electron-builder --win",
     "dist:portable": "electron-builder --win portable",
     "fetch:binaries": "node scripts/fetch-binaries.js"
