@@ -96,7 +96,10 @@ function hostOf(url) {
 function canHandle(provider, url) {
   const h = hostOf(url);
   if (!h) return false;
-  if (provider.hostPattern) return provider.hostPattern.test(h);
+  // A provider matches when its host pattern matches OR one of its
+  // listed hosts does. (The pattern alone missed listed short-link
+  // hosts such as pin.it, which fell through to the generic provider.)
+  if (provider.hostPattern && provider.hostPattern.test(h)) return true;
   return provider.hosts.some((x) => h === x || h.endsWith('.' + x));
 }
 
