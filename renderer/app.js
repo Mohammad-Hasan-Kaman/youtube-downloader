@@ -12,6 +12,7 @@ const qs = (s, r) => (r || document).querySelector(s);
 const qsAll = (s, r) => [...(r || document).querySelectorAll(s)];
 const K = window.kaman;
 const P = window.KamanProviders;
+const Q = window.KamanQueue;
 
 /* ------------------------------------------------------------ icons --- */
 const IC = {
@@ -32,6 +33,8 @@ const IC = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>',
   dl: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0 4-4m-4 4-4-4"/><path d="M4 20h16"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5m0 0-6 6m6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14m0 0 6-6m-6 6-6-6"/></svg>',
 };
 function icon(name) { return IC[name] || ''; }
 qsAll('[data-ico]').forEach((el) => { el.innerHTML = icon(el.dataset.ico); });
@@ -188,12 +191,16 @@ qs('#d-recheck').addEventListener('click', async () => {
 /* ------------------------------------------------- download queue ----- */
 /**
  * A job: { id, url, title, platform, thumb, kind, formatId, formatLabel,
- * subLang, subsMode, thumbMode, outDir, playlistId,
+ * subLang, subLangs, subAutoLangs, subsMode, thumbMode, outDir, playlistId,
+ * priority, seq,
  * status, pct, downloadedKb, totalKb, speedKb, eta, error }
  * status: queued | downloading | merging | paused | done | failed | canceled
+ * priority/seq drive start order (src/queue.js): highest priority first,
+ * insertion order breaks ties; all-default priorities behave as FIFO.
  */
 const jobs = new Map();
 let jobSeq = 0;
+let insertSeq = 0;
 const history = [];
 
 async function persistQueue() {
@@ -248,7 +255,12 @@ function enqueue(input) {
     platform: input.platform || P.detect(url) || 'web',
     thumb: input.thumb || '', kind: input.kind || 'video',
     formatId, formatLabel: input.formatLabel || '',
-    subLang: input.subLang || '', outDir: downloadsDir,
+    subLang: input.subLang || '',
+    subLangs: Array.isArray(input.subLangs) ? input.subLangs : [],
+    subAutoLangs: Array.isArray(input.subAutoLangs) ? input.subAutoLangs : [],
+    priority: Number.isFinite(input.priority) ? input.priority : 0,
+    seq: ++insertSeq,
+    outDir: downloadsDir,
     playlistId: input.playlistId || null,
     status: 'queued', pct: 0, downloadedKb: 0, totalKb: 0, speedKb: 0, eta: '', error: '',
     ...jobOptions(input),
@@ -257,6 +269,7 @@ function enqueue(input) {
   };
   jobs.set(job.id, job);
   renderQueueItem(job);
+  reorderQueueDom();
   updateQueueChrome();
   persistQueue();
   pump();
@@ -270,19 +283,20 @@ function activeCount() {
 }
 
 async function pump() {
-  let n = activeCount();
-  for (const j of jobs.values()) {
-    if (n >= Math.max(1, cfg.concurrency || 2)) break;
-    if (j.status !== 'queued') continue;
+  // Next-job selection is the shared priority order (src/queue.js):
+  // highest priority first, insertion order breaks ties.
+  const free = Math.max(1, cfg.concurrency || 2) - activeCount();
+  for (const j of Q.takeNext(jobs.values(), free)) {
     j.status = 'downloading';
     paintJob(j);
-    n++;
     j.usedProxy = j.forceDirect ? '' : proxy;
     try {
       const realId = await K.download({
         id: j.id, url: j.url, title: j.title, kind: j.kind,
         formatId: j.formatId === 'best' ? 'best' : j.formatId,
         subLang: j.subLang || undefined,
+        subLangs: j.subLangs && j.subLangs.length ? j.subLangs : undefined,
+        subAutoLangs: j.subAutoLangs && j.subAutoLangs.length ? j.subAutoLangs : undefined,
         subsMode: j.subsMode, thumbMode: j.thumbMode,
         rateLimitKb: j.rateLimitKb || 0,
         cookiesBrowser: j.cookiesBrowser || undefined,
@@ -408,6 +422,10 @@ function paintJob(j) {
   };
   if (j.status === 'downloading' || j.status === 'merging') mk('pause', () => pauseJob(j), T.pause);
   if (j.status === 'paused' || j.status === 'failed' || j.status === 'canceled') mk('play', () => resumeJob(j), j.status === 'failed' ? T.retry : T.resume);
+  if (j.status === 'queued') {
+    mk('up', () => bumpPriority(j, 1), T.priorityUp);
+    mk('down', () => bumpPriority(j, -1), T.priorityDown);
+  }
   if (['queued', 'downloading', 'merging', 'paused'].includes(j.status)) mk('x', () => cancelJob(j), T.cancel);
   mk('folder', () => K.openFolder(j.outDir || downloadsDir), T.openFolder);
   if (['done', 'failed', 'canceled'].includes(j.status)) mk('trash', () => removeJob(j), T.remove);
@@ -422,6 +440,26 @@ function paintJobProgress(j) {
   qs('[data-f="sizes"]', el).textContent = j.totalKb ? `${fmtBytes(j.downloadedKb)} / ${fmtBytes(j.totalKb)}` : '';
   qs('[data-f="speed"]', el).textContent = j.speedKb ? `${fmtBytes(j.speedKb)}/s` : '';
   qs('[data-f="eta"]', el).textContent = j.eta ? `${T.eta}: ${j.eta}` : '';
+}
+
+/**
+ * Display order mirrors start order (priority desc, insertion asc).
+ * Reordering only moves existing row nodes - rows are never rebuilt.
+ */
+function reorderQueueDom() {
+  const list = qs('#queue-list');
+  if (!list) return;
+  const ordered = [...jobs.values()].sort((a, b) =>
+    (Q.priorityOf(b) - Q.priorityOf(a)) || ((a.seq || 0) - (b.seq || 0)));
+  for (const j of ordered) {
+    const el = jobEl(j);
+    if (el) list.appendChild(el);
+  }
+}
+function bumpPriority(j, dir) {
+  Q.movePriority(jobs.values(), j.id, dir);
+  reorderQueueDom();
+  persistQueue();
 }
 
 async function pauseJob(j) {
@@ -451,6 +489,7 @@ function renderQueue() {
   const list = qs('#queue-list');
   list.innerHTML = '';
   for (const j of jobs.values()) renderQueueItem(j);
+  reorderQueueDom();
   updateQueueChrome();
 }
 function updateQueueChrome() {
@@ -1094,7 +1133,16 @@ async function loadVersions() {
   loadVersions();
   // restore queue + history
   const savedQ = await K.settingGet('queueV3').catch(() => null);
-  if (Array.isArray(savedQ)) for (const j of savedQ) { jobs.set(j.id, j); renderQueueItem(j); }
+  if (Array.isArray(savedQ)) {
+    for (const j of savedQ) {
+      if (!Number.isFinite(j.priority)) j.priority = 0;
+      if (!Number.isFinite(j.seq)) j.seq = ++insertSeq;
+      if (j.seq > insertSeq) insertSeq = j.seq;
+      jobs.set(j.id, j);
+      renderQueueItem(j);
+    }
+    reorderQueueDom();
+  }
   const savedH = await K.settingGet('historyV3').catch(() => null);
   if (Array.isArray(savedH)) { history.push(...savedH); renderHistory(); renderHomeRecent(); }
   updateQueueChrome();
