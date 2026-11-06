@@ -112,7 +112,7 @@ class YtdlpService extends EventEmitter {
     if (o._type === 'playlist' && o.entries) {
       return this._playlistShape(o);
     }
-    return this._videoShape(o);
+    return this._videoShape(o, url);
   }
 
   async playlist(url, proxy, opts) {
@@ -141,7 +141,7 @@ class YtdlpService extends EventEmitter {
     };
   }
 
-  _videoShape(o) {
+  _videoShape(o, url) {
     const allFormats = o.formats || [];
     const formats = allFormats.filter((f) => f.vcodec && f.vcodec !== 'none' && f.height);
 
