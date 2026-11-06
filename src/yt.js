@@ -141,6 +141,42 @@ class YtdlpService extends EventEmitter {
     };
   }
 
+  /** Normalise a yt-dlp subtitle map ({ lang: [tracks] }) to [{lang, name}]. */
+  _subList(map) {
+    return Object.entries(map || {})
+      .filter(([, tracks]) => Array.isArray(tracks) && tracks.length)
+      .map(([lang]) => {
+        try {
+          const r = new Intl.DisplayNames(['fa'], { type: 'language' });
+          return { lang, name: r.of(lang) || lang };
+        } catch (_) { return { lang, name: lang }; }
+      });
+  }
+
+  /**
+   * Subtitle arguments for a download job. A requested language the video
+   * only has as an auto-generated caption (listed in job.subAutoLangs and
+   * not in job.subLangs) is fetched with --write-auto-subs; an embedded
+   * auto caption is still embedded after being written. Every other case
+   * keeps the manual behaviour: --embed-subs soft-embedded into the
+   * container, or --write-sub as a separate file. A job carrying no
+   * language lists at all is treated as manual, exactly as before.
+   */
+  _subArgs(job, subsMode) {
+    if (job.kind === 'image' || !job.subLang || subsMode === 'disabled') return [];
+    const manual = Array.isArray(job.subLangs) && job.subLangs.includes(job.subLang);
+    const autoOnly = !manual
+      && Array.isArray(job.subAutoLangs) && job.subAutoLangs.includes(job.subLang);
+    const out = ['--sub-langs', job.subLang, '--convert-subs', 'srt'];
+    if (autoOnly) {
+      out.unshift('--write-auto-subs');
+      if (subsMode === 'embedded') out.push('--embed-subs');
+      return out;
+    }
+    out.unshift(subsMode === 'separate' ? '--write-sub' : '--embed-subs');
+    return out;
+  }
+
   _videoShape(o, url) {
     const allFormats = o.formats || [];
     const formats = allFormats.filter((f) => f.vcodec && f.vcodec !== 'none' && f.height);
@@ -164,6 +200,7 @@ class YtdlpService extends EventEmitter {
           uploadDate: o.upload_date || '',
           description: (o.description || '').slice(0, 1200),
           subtitles: [],
+          autoSubtitles: [],
           qualities: [],
           audio: null,
           image: {
@@ -205,16 +242,13 @@ class YtdlpService extends EventEmitter {
       if (!bestAudio || score > bestAudio._s) { f._s = score; bestAudio = f; }
     }
 
-    // real available subtitles (language + human name)
-    const subMap = o.subtitles || {};
-    const subtitles = Object.entries(subMap)
-      .filter(([, tracks]) => Array.isArray(tracks) && tracks.length)
-      .map(([lang]) => {
-        try {
-          const r = new Intl.DisplayNames(['fa'], { type: 'language' });
-          return { lang, name: r.of(lang) || lang };
-        } catch (_) { return { lang, name: lang }; }
-      });
+    // Real available subtitles (language + human name). Manual tracks and
+    // auto-generated captions are separate lists; a language present in
+    // both stays manual-only, because the manual track is the real one.
+    const subtitles = this._subList(o.subtitles);
+    const manualLangs = new Set(subtitles.map((s) => s.lang));
+    const autoSubtitles = this._subList(o.automatic_captions)
+      .filter((s) => !manualLangs.has(s.lang));
 
     return {
       type: 'video',
@@ -228,6 +262,7 @@ class YtdlpService extends EventEmitter {
       uploadDate: o.upload_date || '',
       description: (o.description || '').slice(0, 1200),
       subtitles,
+      autoSubtitles,
       qualities,
       audio: bestAudio && {
         formatId: bestAudio.format_id,
@@ -278,14 +313,9 @@ class YtdlpService extends EventEmitter {
       args.push('-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best');
     }
 
-    // Subtitles: embedded into the container, a separate .srt, or skipped.
-    if (job.kind !== 'image' && job.subLang && subsMode !== 'disabled') {
-      if (subsMode === 'separate') {
-        args.push('--write-sub', '--sub-langs', job.subLang, '--convert-subs', 'srt');
-      } else {
-        args.push('--embed-subs', '--sub-langs', job.subLang, '--convert-subs', 'srt');
-      }
-    }
+    // Subtitles: embedded into the container, a separate .srt, or skipped;
+    // auto-generated captions go through --write-auto-subs (see _subArgs).
+    args.push(...this._subArgs(job, subsMode));
     // Thumbnail: embedded into the media file or saved next to it.
     if (job.kind === 'image') {
       // the file IS the image - no thumbnail handling

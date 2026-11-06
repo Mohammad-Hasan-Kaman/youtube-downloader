@@ -45,6 +45,18 @@ test('substitution placeholders: {name}-style tokens match across languages', ()
   }
 });
 
+test('feature keys: auto-caption badge and priority actions in every language', () => {
+  const badge = {
+    fa: 'خودکار', en: 'Auto', de: 'Auto', ar: 'تلقائي', es: 'Auto', ru: 'Авто', zh: '自动',
+  };
+  for (const lang of EXPECTED_LANGS) {
+    const dict = i18n.getI18n(lang);
+    assert.equal(dict.subAuto, badge[lang], `${lang}.subAuto`);
+    assert.ok(dict.priorityUp, `${lang}.priorityUp missing`);
+    assert.ok(dict.priorityDown, `${lang}.priorityDown missing`);
+  }
+});
+
 test('RTL: only fa and ar are right-to-left', () => {
   assert.equal(i18n.isRtl('fa'), true);
   assert.equal(i18n.isRtl('ar'), true);

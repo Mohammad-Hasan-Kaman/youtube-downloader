@@ -536,7 +536,9 @@ function mountPreview(mount, info, sourceUrl) {
   const wrap = document.createElement('div');
   wrap.className = 'preview card';
   const subOpts = ['<option value="">' + esc(T.subtitleNone) + '</option>']
-    .concat((info.subtitles || []).map((s) => `<option value="${esc(s.lang)}">${esc(s.name)} (${esc(s.lang)})</option>`)).join('');
+    .concat((info.subtitles || []).map((s) => `<option value="${esc(s.lang)}">${esc(s.name)} (${esc(s.lang)})</option>`))
+    .concat((info.autoSubtitles || []).map((s) => `<option value="${esc(s.lang)}">${esc(s.name)} (${esc(s.lang)}) · ${esc(T.subAuto)}</option>`))
+    .join('');
   wrap.innerHTML = `
     <div class="preview-media">${info.thumb ? `<img src="${esc(info.thumb)}" alt="">` : ''}</div>
     <div class="preview-main">
@@ -613,6 +615,8 @@ function mountPreview(mount, info, sourceUrl) {
   const base = () => ({
     url: info.url || sourceUrl, title: info.title, platform,
     thumb: info.thumb, subLang: subSel.value || '',
+    subLangs: (info.subtitles || []).map((s) => s.lang),
+    subAutoLangs: (info.autoSubtitles || []).map((s) => s.lang),
     subsMode: qs('[data-role="subsmode"]', wrap).value,
     thumbMode: qs('[data-role="thumbmode"]', wrap).value,
     useAccount: sessSel ? sessSel.value !== 'off' : undefined,

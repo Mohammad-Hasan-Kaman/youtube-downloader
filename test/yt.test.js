@@ -48,6 +48,23 @@ test('video shape: subtitle list comes from the tracks the video really has', ()
   assert.deepEqual(shape.subtitles.map((s) => s.lang), ['en', 'fa']);
 });
 
+test('video shape: automatic captions are a separate list from manual subtitles', () => {
+  const shape = svc._videoShape({
+    id: 'abc', formats: [fmt({})],
+    subtitles: { en: [{ ext: 'vtt' }] },
+    automatic_captions: { en: [{ ext: 'vtt' }], de: [{ ext: 'vtt' }], fr: [] },
+  }, 'https://www.youtube.com/watch?v=abc');
+  assert.deepEqual(shape.subtitles.map((s) => s.lang), ['en']);
+  // 'en' also exists as a manual track, so it is not repeated as an
+  // automatic caption; languages with no tracks never appear either.
+  assert.deepEqual(shape.autoSubtitles.map((s) => s.lang), ['de']);
+});
+
+test('video shape: no automatic_captions in extractor output -> empty auto list', () => {
+  const shape = svc._videoShape({ id: 'x', formats: [fmt({})], subtitles: {} }, 'https://example.com/v');
+  assert.deepEqual(shape.autoSubtitles, []);
+});
+
 test('video shape: url falls back to the requested URL when the extractor omits one', () => {
   // Regression: _videoShape used to reference an undefined `url` variable
   // and throw a ReferenceError on this path.
@@ -111,6 +128,53 @@ test('common args: proxy and opt-in account access are passed through', () => {
   const byBrowser = svc._commonArgs('', [], { cookiesBrowser: 'chrome' });
   assert.deepEqual(byBrowser.slice(byBrowser.indexOf('--cookies-from-browser')),
     ['--cookies-from-browser', 'chrome']);
+});
+
+/* ------------------------------------------------------------ _subArgs */
+
+const subJob = (over) => ({
+  kind: 'video', subLang: 'en', subLangs: ['en'], subAutoLangs: [], ...over,
+});
+
+test('sub args: manual language, separate file - --write-sub, never --write-auto-subs', () => {
+  assert.deepEqual(svc._subArgs(subJob({}), 'separate'),
+    ['--write-sub', '--sub-langs', 'en', '--convert-subs', 'srt']);
+});
+
+test('sub args: manual language, embedded - --embed-subs only', () => {
+  assert.deepEqual(svc._subArgs(subJob({}), 'embedded'),
+    ['--embed-subs', '--sub-langs', 'en', '--convert-subs', 'srt']);
+});
+
+test('sub args: auto-only language - --write-auto-subs, never --write-sub', () => {
+  const args = svc._subArgs(subJob({ subLangs: [], subAutoLangs: ['en'] }), 'separate');
+  assert.ok(args.includes('--write-auto-subs'));
+  assert.ok(!args.includes('--write-sub'));
+  assert.ok(!args.includes('--embed-subs'));
+});
+
+test('sub args: auto-only language, embedded mode - the written auto caption is embedded', () => {
+  const args = svc._subArgs(subJob({ subLangs: [], subAutoLangs: ['en'] }), 'embedded');
+  assert.ok(args.includes('--write-auto-subs'));
+  assert.ok(args.includes('--embed-subs'));
+  assert.ok(!args.includes('--write-sub'));
+});
+
+test('sub args: a language in both lists prefers the manual track', () => {
+  const args = svc._subArgs(subJob({ subLangs: ['en'], subAutoLangs: ['en'] }), 'separate');
+  assert.ok(args.includes('--write-sub'));
+  assert.ok(!args.includes('--write-auto-subs'));
+});
+
+test('sub args: no language lists on the job - manual behaviour, as before', () => {
+  assert.deepEqual(svc._subArgs({ kind: 'video', subLang: 'fa' }, 'separate'),
+    ['--write-sub', '--sub-langs', 'fa', '--convert-subs', 'srt']);
+});
+
+test('sub args: disabled mode, missing language and image jobs get no subtitle args', () => {
+  assert.deepEqual(svc._subArgs(subJob({}), 'disabled'), []);
+  assert.deepEqual(svc._subArgs(subJob({ subLang: '' }), 'separate'), []);
+  assert.deepEqual(svc._subArgs(subJob({ kind: 'image' }), 'separate'), []);
 });
 
 test('ffmpeg detection: absent vendor dir means no ffmpeg, version lookup tolerated', async () => {
