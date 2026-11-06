@@ -1,0 +1,18 @@
+KamanTube — Universal Media Downloader
+Copyright (c) 2026 Mohammad Hasan Kaman
+
+KamanTube's own code is licensed under the MIT License; see the LICENSE
+file in this repository.
+
+This product bundles or references third-party components that remain
+under their own licenses:
+
+  - Aether core (CluvexStudio/Aether) — AGPL-3.0. The official binary is
+    distributed unmodified and executed as an external process.
+  - yt-dlp (yt-dlp/yt-dlp) — The Unlicense.
+  - FFmpeg (GyanD/codexffmpeg essentials build) — GPL.
+  - Electron / Chromium / Node.js — MIT / BSD-3-Clause.
+  - PattN (patterniha/PattN) — GPL-3.0. Architecture reference only;
+    no PattN code is copied, bundled, or required at runtime.
+
+Full attributions and license texts are in THIRD_PARTY_NOTICES.md.
