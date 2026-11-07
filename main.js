@@ -241,6 +241,14 @@ ipcMain.handle('yt:playlist', async (_e, url, proxy, opts) => {
 });
 ipcMain.handle('yt:download', async (_e, job, proxy) => {
   assertNotBlocked(job && job.url);
+  // Route is decided HERE, at spawn time, from the tunnel's live state -
+  // not from the renderer's snapshot, which is '' until the first tunnel
+  // status event and stale after any reconnect. When the renderer did not
+  // pin a route, wait for the tunnel attempt to settle first: a download
+  // spawned on the wrong route hangs in extraction at 0% with no fallback.
+  if (!proxy && tunnel) {
+    try { await tunnel.ensure(); } catch (_) { /* proceed on current route */ }
+  }
   return yt.download(job, withProxy(proxy));
 });
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));

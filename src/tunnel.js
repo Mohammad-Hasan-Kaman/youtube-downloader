@@ -174,9 +174,12 @@ class TunnelManager extends EventEmitter {
     this.proc = null;
   }
 
-  freePort() {
+  async freePort() {
     for (let port = PORT_BASE; port <= PORT_BASE + 12; port++) {
-      if (!this._portInUse(port)) return port;
+      // _portInUse is async: without the await the Promise object itself
+      // was tested (always truthy), so no port ever qualified and every
+      // attempt fell through to PORT_BASE even when it was taken.
+      if (!(await this._portInUse(port))) return port;
     }
     return PORT_BASE;
   }
@@ -289,7 +292,7 @@ class TunnelManager extends EventEmitter {
   }
 
   async runAttempt(attempt, timeoutMs) {
-    this.port = this.freePort();
+    this.port = await this.freePort();
     const proc = this._spawnAttempt(attempt);
     this.proc = proc;
     let sawPort = false;

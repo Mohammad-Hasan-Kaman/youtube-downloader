@@ -60,6 +60,12 @@ class YtdlpService extends EventEmitter {
       '--no-warnings',
       '--no-playlist',
       '--skip-download',
+      // Fail fast on a dead route: without these, yt-dlp retries stretch
+      // one extraction toward the full _exec timeout (60-120 s) before
+      // the route fallback in main ever gets its turn.
+      '--socket-timeout', '15',
+      '--retries', '2',
+      '--extractor-retries', '1',
       ...(extra || []),
       ...(proxy ? ['--proxy', proxy] : []),
       // Optional, explicit user opt-in only: use the signed-in session from
@@ -106,13 +112,28 @@ class YtdlpService extends EventEmitter {
   /* ------------------------------------------------------ video info ---- */
 
   async info(url, proxy, opts) {
-    const args = this._commonArgs(proxy, ['--dump-single-json', url], opts);
-    const stdout = await this._exec(args, 90000);
-    const o = JSON.parse(stdout);
-    if (o._type === 'playlist' && o.entries) {
-      return this._playlistShape(o);
-    }
-    return this._videoShape(o, url);
+    // Short-lived cache + in-flight dedupe: the preview, the quality
+    // picker and the detail view all ask for the same URL within seconds
+    // of each other, and a full extraction is the slowest call in the app.
+    if (!this._infoCache) this._infoCache = new Map();
+    const key = `${url}|${proxy || ''}|${(opts && opts.cookiesFile) || ''}|${(opts && opts.cookiesBrowser) || ''}`;
+    const hit = this._infoCache.get(key);
+    if (hit && Date.now() - hit.t < 300000) return hit.p;
+    const p = (async () => {
+      const args = this._commonArgs(proxy, ['--dump-single-json', url], opts);
+      const stdout = await this._exec(args, 90000);
+      const o = JSON.parse(stdout);
+      if (o._type === 'playlist' && o.entries) {
+        return this._playlistShape(o);
+      }
+      return this._videoShape(o, url);
+    })();
+    this._infoCache.set(key, { t: Date.now(), p });
+    p.catch(() => {
+      const c = this._infoCache.get(key);
+      if (c && c.p === p) this._infoCache.delete(key);
+    });
+    return p;
   }
 
   async playlist(url, proxy, opts) {
@@ -291,6 +312,13 @@ class YtdlpService extends EventEmitter {
       '--newline',
       '--no-playlist',
       '--continue',
+      // Bounded retries: a dead route must fail in bounded time so the
+      // job errors out (and frees its queue slot) instead of churning
+      // silently at 0% with no total deadline.
+      '--socket-timeout', '20',
+      '--retries', '3',
+      '--fragment-retries', '3',
+      '--extractor-retries', '3',
       '--merge-output-format', 'mp4',
       '-o', path.join(outDir, '%(title)s [%(id)s].%(ext)s'),
       ...(this.ffmpegDir() ? ['--ffmpeg-location', this.ffmpegDir()] : []),
@@ -329,13 +357,16 @@ class YtdlpService extends EventEmitter {
     const id = job.id || `j${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
     const child = spawn(this.binPath(), args, { windowsHide: true });
     this._jobs.set(id, child);
-    // if the connection dies, yt-dlp can hang silently - kill it so the
-    // queue keeps moving and the tunnel watchdog can reconnect.
-    let lastActivity = Date.now();
+    let settled = false;
+    // Stall watchdog measures PROGRESS, not output: yt-dlp retry warnings
+    // on stderr used to reset the old activity timer forever, so a job on
+    // a dead route sat at 0% indefinitely and held its queue slot.
+    let lastProgress = Date.now();
     const hangWatch = setInterval(() => {
-      if (Date.now() - lastActivity > 180000) {
+      if (Date.now() - lastProgress > 180000) {
         clearInterval(hangWatch);
         this._jobs.delete(id);
+        settled = true;
         const { spawn: sp } = require('child_process');
         try { sp('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true }); } catch (_) { child.kill('SIGTERM'); }
         send({ type: 'error', message: 'download stalled (no progress for 3 min) - tunnel reconnecting' });
@@ -349,11 +380,11 @@ class YtdlpService extends EventEmitter {
 
     let lastPct = -1;
     child.stdout.on('data', (chunk) => {
-      lastActivity = Date.now();
       for (const line of chunk.toString().split('\n')) {
         const m = /\[download\]\s+([\d.]+)% of\s+~?\s*([\d.]+)(KiB|MiB|GiB) at\s+([\d.]+)(KiB|MiB|GiB)\/s ETA (\d+):(\d+)/.exec(line)
           || /\[download\]\s+([\d.]+)% of\s+~?\s*([\d.]+)(KiB|MiB|GiB) at\s+([\d.]+)(KiB|MiB|GiB)\/s/.exec(line);
         if (m) {
+          lastProgress = Date.now();
           const units = { KiB: 1, MiB: 1024, GiB: 1024 * 1024 };
           const pct = parseFloat(m[1]);
           if (pct !== lastPct) {
@@ -370,6 +401,7 @@ class YtdlpService extends EventEmitter {
             });
           }
         } else if (line.includes('[Merger]') || line.includes('[ExtractAudio]')) {
+          lastProgress = Date.now();
           send({ type: 'merging', message: 'merging' });
         }
       }
@@ -377,7 +409,6 @@ class YtdlpService extends EventEmitter {
 
     let lastError = '';
     child.stderr.on('data', (chunk) => {
-      lastActivity = Date.now();
       const t = chunk.toString();
       for (const line of t.split('\n')) {
         if (/ERROR/i.test(line)) lastError = line.trim().slice(0, 240);
@@ -385,8 +416,22 @@ class YtdlpService extends EventEmitter {
       if (t.trim()) send({ type: 'log', message: t.trim().slice(0, 300) });
     });
 
+    child.on('error', (err) => {
+      // Spawn itself failed (missing/corrupt binary): without this handler
+      // no terminal event ever reaches the renderer, the job stays
+      // 'downloading' forever and its queue slot leaks.
+      clearInterval(hangWatch);
+      this._jobs.delete(id);
+      if (!settled) {
+        settled = true;
+        send({ type: 'error', message: `failed to start yt-dlp: ${(err && err.message) || err}` });
+      }
+    });
+
     child.on('close', (code) => {
       this._jobs.delete(id);
+      if (settled) return;
+      settled = true;
       if (code === 0) send({ type: 'done', title: job.title });
       else send({ type: 'error', message: lastError || `exited with code ${code}` });
     });
