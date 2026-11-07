@@ -53,7 +53,7 @@ const cfg = {
 };
 let RTL = true;
 const PLATFORM_COLORS = { youtube: '#e62117', pinterest: '#c8232c', instagram: '#b83a7d', tiktok: '#3aa6a0', x: '#888', web: '#c8871a' };
-const NAV_KEYS = { home: 'navHome', search: 'navSearch', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
+const NAV_KEYS = { home: 'navHome', search: 'navSearch', detail: 'detailTitle', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
 
 const fmtBytes = (kb) => {
   if (!kb || kb <= 0) return '';
@@ -125,7 +125,8 @@ async function setTheme(v) {
 /* -------------------------------------------------------- router ------ */
 function go(p) {
   page = p;
-  qsAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === p));
+  // The detail page belongs to Search: keep its nav entry highlighted.
+  qsAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === p || (p === 'detail' && b.dataset.page === 'search')));
   qsAll('[data-page-panel]').forEach((s) => s.classList.toggle('active', s.dataset.pagePanel === p));
   qs('#page-title').textContent = T[NAV_KEYS[p]] || '';
   qs('#pages').scrollTop = 0;
@@ -834,13 +835,18 @@ function friendlyError(raw) {
   return T.fetchFailed + ' — ' + m.slice(0, 160);
 }
 
-async function startFetch(raw) {
+async function startFetch(raw, dest) {
   const url = String(raw || '').trim();
-  go('new');
-  qs('#new-url').value = url;
-  qs('#new-url').dispatchEvent(new Event('input'));
-  const status = qs('#new-status');
-  const mount = qs('#new-preview');
+  // dest 'detail' renders into the dedicated detail page (opened from a
+  // search result); anything else uses the New Download page as before.
+  const onDetail = dest === 'detail';
+  go(onDetail ? 'detail' : 'new');
+  if (!onDetail) {
+    qs('#new-url').value = url;
+    qs('#new-url').dispatchEvent(new Event('input'));
+  }
+  const status = qs(onDetail ? '#detail-status' : '#new-status');
+  const mount = qs(onDetail ? '#detail-preview' : '#new-preview');
   mount.innerHTML = '';
   if (!/^https?:\/\//i.test(url)) {
     status.hidden = false; status.className = 'status-line err'; status.textContent = T.invalidUrl;
@@ -907,22 +913,18 @@ function searchCard(it) {
     <div class="vcard-body">
       <div class="vcard-title bidi" dir="auto" title="${esc(it.title)}">${esc(it.title)}</div>
       <div class="vcard-meta">${esc(it.uploader || '')}${it.views ? ' · ' + fmtViews(it.views) + ' ' + esc(T.views) : ''}</div>
-      <div class="vcard-actions">
-        <button class="btn btn-small btn-primary" data-a="dl">${esc(T.download)}</button>
-        <button class="btn btn-small" data-a="opt">${esc(T.quality)}</button>
-      </div>
     </div>`;
-  qs('[data-a="dl"]', el).addEventListener('click', () => {
+  // Owner's request: clicking a result opens that content's own detail
+  // page - preview, qualities and download live there - instead of the
+  // card carrying inline Download / Quality buttons.
+  el.classList.add('clickable');
+  el.addEventListener('click', () => {
     if (it.isPlaylist) { go('playlists'); qs('#pl-url').value = it.url; loadPlaylist(); return; }
-    enqueue({ url: it.url, title: it.title, thumb: it.thumb, platform: 'youtube', kind: 'video', formatId: 'best', formatLabel: T.qualityBest });
-    toast(T.addedToQueue); go('queue');
-  });
-  qs('[data-a="opt"]', el).addEventListener('click', () => {
-    if (it.isPlaylist) { go('playlists'); qs('#pl-url').value = it.url; loadPlaylist(); return; }
-    startFetch(it.url);
+    startFetch(it.url, 'detail');
   });
   return el;
 }
+qs('#detail-back').addEventListener('click', () => go('search'));
 qs('#search-btn').addEventListener('click', runSearch);
 qs('#search-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
 
