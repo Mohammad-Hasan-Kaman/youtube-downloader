@@ -14,7 +14,7 @@ per country.
 
 ```text
 Platforms   YouTube · Pinterest · Instagram · TikTok · X · any yt-dlp site
-Interface   10 pages · 7 languages · dark / light / system themes
+Interface   11 sections · 7 languages · dark / light / system themes
 Releases    Windows installer only (KamanTube-Setup-<version>.exe)
 License     MIT (third-party components keep their own licenses)
 ```
@@ -39,6 +39,14 @@ License     MIT (third-party components keep their own licenses)
   videos and playlists). The other platforms offer no public search for the
   download core to read, so the Search page routes you to each platform's
   listing page instead of pretending otherwise.
+- **A detail page for every result** — clicking a search result opens that
+  content's own page: preview, the real qualities the site offers (the
+  "best" option names its actual resolution) and the download options.
+- **A section per platform, and every supported site** — the Platforms
+  page gives each platform its own space (its link box, capabilities and
+  shortcuts), and the Supported Sites directory lists everything the
+  engine can download from: over 1,700 sites, read live from yt-dlp
+  itself rather than copied from a marketing page.
 - **Media library** — browse, open and delete the files in your downloads
   folder from inside the app.
 - **Diagnostics** — your public IP and country, the active routing mode and
@@ -107,11 +115,12 @@ browser or the cookies.txt option in that case.
 
 ## Site blocking
 
-KamanTube ships with a built-in blocklist of adult sites (20 domains,
-subdomains included) that is **on by default**; downloads, previews and
-playlist loads from those hosts are refused. You can switch the built-in
-list off and add your own domains in Settings → Safety. Enforcement happens
-in the main process, so no screen in the app can bypass it.
+KamanTube ships with a built-in blocklist of adult sites (100+ domains,
+subdomains included) that is **always on**; downloads, previews and
+playlist loads from those hosts are refused. There is no setting for it:
+the filter cannot be switched off or edited from inside the app.
+Enforcement happens in the main process, so no screen in the app can
+bypass it.
 
 ## Languages and themes
 
@@ -199,7 +208,7 @@ src/tunnel.js      Aether orchestration: detection, protocols, health checks
 src/yt.js          yt-dlp service: search, info, playlists, downloads
 src/i18n.js        all UI strings for the 7 languages + RTL rules
 src/state.js       persistent settings (JSON in the user data folder)
-renderer/          the interface (10 pages, vanilla JS + CSS)
+renderer/          the interface (11 sections, vanilla JS + CSS)
 scripts/           binary fetching, release upload, CDP smoke/e2e checks
 test/              unit tests (node:test)
 vendor/            runtime binaries, fetched — not in git

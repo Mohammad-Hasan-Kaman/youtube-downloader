@@ -1,7 +1,7 @@
 {
   "name": "kamantube",
   "productName": "KamanTube",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "KamanTube — Universal Media Downloader: YouTube, Pinterest, Instagram, TikTok and X with automatic smart routing",
   "main": "main.js",
   "author": " MohammadHasan Kaman",

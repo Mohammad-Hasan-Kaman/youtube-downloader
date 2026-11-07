@@ -4,6 +4,59 @@ All notable changes to KamanTube are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project
 uses [Semantic Versioning](https://semver.org/).
 
+## [3.1.0] - 2026-11-07
+
+A revision driven by the first hands-on test of 3.0.0 by the owner: two
+download-path bugs, a faster preview, and a set of interface changes he
+asked for by name.
+
+### Fixed
+
+- **Queued downloads that never started.** Jobs restored from the saved
+  queue at launch were never pumped, so they sat in the queue forever;
+  restored 'queued' jobs now start at boot. Downloads also no longer lock
+  onto the renderer's stale route snapshot: the main process decides the
+  route at spawn time and waits for the tunnel to settle first. The stall
+  watchdog measures real download progress instead of yt-dlp's retry
+  chatter (which used to reset it forever), downloads carry bounded
+  network retries, and a failed spawn now reports an error instead of
+  leaking its queue slot silently.
+- **Slow previews.** The preview flow paid up to two full extractions in
+  series (plus a second route's timeout) before showing anything. It now
+  asks the endpoint that matches the URL shape first, extraction calls
+  fail fast on dead routes (`--socket-timeout` / bounded retries), info
+  results are cached for five minutes with in-flight de-duplication, and
+  a missing `await` in the tunnel's free-port probe (which made every
+  attempt reuse the same port) is fixed.
+
+### Added
+
+- **Detail page for search results.** Clicking a result opens that
+  content's own page — preview, qualities and download — instead of the
+  card carrying inline Download / Quality buttons.
+- **Platforms page and a section per platform.** Every platform now has
+  its own space: its link box, capability chips and shortcuts (search
+  for YouTube, listings for the others).
+- **Supported Sites directory.** Every site the bundled yt-dlp can
+  download from — over 1,700 — listed and searchable, read live from
+  `yt-dlp --list-extractors`.
+- **New app icon**: an amber play/download mark on charcoal.
+
+### Changed
+
+- **Adult-site filtering is built in and always on.** The Settings →
+  Safety section is gone; the built-in list grew from 20 to 100+
+  domains and can no longer be switched off or edited in the app.
+- **The "best quality" option names its resolution** (e.g. "Best quality
+  (1080p)"), taken from the formats the site actually offers.
+- **Responsive layout and a topbar/settings redesign**: the topbar wraps
+  instead of squeezing (64 px, roomier network chip and switchers),
+  settings cards get pill titles that no longer render half-clipped and
+  a two-column grid, the sidebar collapses to an icon rail under
+  1020 px, and the window can shrink to 860 px.
+- Persian wording: "تصویر پیش‌نمایش" (preview image) replaces the
+  "بندانگشتی" calque for thumbnails.
+
 ## [3.0.0] - 2026-11-06
 
 A ground-up rewrite of the v2 line: from a YouTube downloader with a tunnel
