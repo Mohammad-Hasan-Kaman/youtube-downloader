@@ -18,6 +18,7 @@ const Q = window.KamanQueue;
 const IC = {
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   playlist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 10h12M4 14h7"/><path d="m15 14 6 3.5-6 3.5z"/></svg>',
   queue: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v10m0 0 4-4m-4 4L8 9"/><path d="M4 17v3h16v-3"/></svg>',
@@ -53,7 +54,7 @@ const cfg = {
 };
 let RTL = true;
 const PLATFORM_COLORS = { youtube: '#e62117', pinterest: '#c8232c', instagram: '#b83a7d', tiktok: '#3aa6a0', x: '#888', web: '#c8871a' };
-const NAV_KEYS = { home: 'navHome', search: 'navSearch', detail: 'detailTitle', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
+const NAV_KEYS = { home: 'navHome', search: 'navSearch', detail: 'detailTitle', platforms: 'navPlatforms', platform: 'navPlatforms', sites: 'supportedSites', new: 'navNew', playlists: 'navPlaylists', queue: 'navQueue', history: 'navHistory', library: 'navLibrary', settings: 'navSettings', diagnostics: 'navDiagnostics', about: 'navAbout' };
 
 const fmtBytes = (kb) => {
   if (!kb || kb <= 0) return '';
@@ -95,6 +96,8 @@ function applyStrings() {
   qs('#pl-url').placeholder = T.playlistPlaceholder || '';
   qs('#search-input').placeholder = T.searchPlaceholder || '';
   qs('#lib-search').placeholder = T.librarySearchPlaceholder || '';
+  const pfUrl = qs('#pf-url'); if (pfUrl) pfUrl.placeholder = T.pastePlaceholder || '';
+  const sitesFilter = qs('#sites-filter'); if (sitesFilter) sitesFilter.placeholder = T.sitesSearchPh || '';
   qsAll('#lang-seg .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.langPick === LANG));
   const sel = qs('#s-lang'); if (sel) sel.value = LANG;
   renderPlatformGrid();
@@ -125,14 +128,19 @@ async function setTheme(v) {
 /* -------------------------------------------------------- router ------ */
 function go(p) {
   page = p;
-  // The detail page belongs to Search: keep its nav entry highlighted.
-  qsAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === p || (p === 'detail' && b.dataset.page === 'search')));
+  // Detail belongs to Search; a platform and the sites list belong to
+  // Platforms: keep the parent nav entry highlighted on sub-pages.
+  qsAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.page === p
+    || (p === 'detail' && b.dataset.page === 'search')
+    || ((p === 'platform' || p === 'sites') && b.dataset.page === 'platforms')));
   qsAll('[data-page-panel]').forEach((s) => s.classList.toggle('active', s.dataset.pagePanel === p));
   qs('#page-title').textContent = T[NAV_KEYS[p]] || '';
   qs('#pages').scrollTop = 0;
   if (p === 'library') loadLibrary();
   if (p === 'diagnostics') refreshDiagnostics();
   if (p === 'home') renderHomeRecent();
+  if (p === 'platforms') renderPlatformsPage();
+  if (p === 'sites') loadSites();
 }
 qsAll('.nav-btn').forEach((b) => b.addEventListener('click', () => go(b.dataset.page)));
 
@@ -798,6 +806,78 @@ function renderExploreGrid() {
     }));
   }
 }
+/* ----------------------------------------------------- platforms ------
+ * Owner's request: every platform gets its OWN section instead of the
+ * paste-a-link-and-we-detect-it model, and the app surfaces the full
+ * supported-sites list of its engine (the same 1,700+ sites the big
+ * Telegram downloader bots advertise, read live from yt-dlp itself). */
+let curPlatform = null;
+function renderPlatformsPage() {
+  const grid = qs('#platforms-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const p of [...P.PROVIDERS, P.FALLBACK]) {
+    grid.appendChild(platformCard(p, () => openPlatform(p)));
+  }
+  loadSitesCount();
+}
+async function loadSitesCount() {
+  const el = qs('#sites-count');
+  if (!el) return;
+  try {
+    const names = await K.extractors();
+    el.textContent = `${names.length.toLocaleString()} · yt-dlp`;
+  } catch (_) { el.textContent = ''; }
+}
+function openPlatform(p) {
+  curPlatform = p;
+  go('platform');
+  qs('#page-title').textContent = T[p.nameKey] || p.id;
+  const chips = (p.features || []).map((f) => `<span class="chip">${esc(T[f] || '')}</span>`).join('');
+  qs('#pf-head').innerHTML = `
+    <div class="pf-title"><span class="platform-dot" style="background:${PLATFORM_COLORS[p.id] || '#888'}"></span>
+    <span class="platform-name">${esc(T[p.nameKey] || p.id)}</span></div>
+    <p class="page-sub">${esc(T[p.noteKey] || '')}</p>
+    ${chips ? `<div class="feat-chips">${chips}</div>` : ''}`;
+  qs('#pf-url').value = '';
+  qs('#pf-search').hidden = !(p.capabilities && p.capabilities.search);
+  qs('#pf-playlists').hidden = !(p.capabilities && (p.capabilities.playlists || p.capabilities.collections));
+  qs('#pf-url').focus();
+}
+qs('#sites-open').addEventListener('click', () => go('sites'));
+qs('#sites-back').addEventListener('click', () => go('platforms'));
+qs('#pf-back').addEventListener('click', () => go('platforms'));
+qs('#pf-fetch').addEventListener('click', () => startFetch(qs('#pf-url').value));
+qs('#pf-search').addEventListener('click', () => { go('search'); qs('#search-input').focus(); });
+qs('#pf-playlists').addEventListener('click', () => {
+  const v = qs('#pf-url').value.trim();
+  go('playlists');
+  if (/^https?:\/\//i.test(v)) { qs('#pl-url').value = v; loadPlaylist(); }
+  else qs('#pl-url').focus();
+});
+
+let sitesCache = null;
+async function loadSites() {
+  const status = qs('#sites-status');
+  if (!qs('#sites-grid')) return;
+  if (!sitesCache) {
+    status.textContent = T.fetchingInfo || '…';
+    try { sitesCache = await K.extractors(); } catch (_) { sitesCache = []; }
+  }
+  status.textContent = sitesCache.length
+    ? `${T.supportedSites}: ${sitesCache.length.toLocaleString()}`
+    : (T.searchFailed || '');
+  renderSites(qs('#sites-filter').value);
+}
+function renderSites(filter) {
+  const grid = qs('#sites-grid');
+  if (!grid || !sitesCache) return;
+  const f = String(filter || '').trim().toLowerCase();
+  const names = f ? sitesCache.filter((n) => n.toLowerCase().includes(f)) : sitesCache;
+  grid.innerHTML = names.slice(0, 2000).map((n) => `<span class="site-chip">${esc(n)}</span>`).join('');
+}
+qs('#sites-filter').addEventListener('input', (e) => renderSites(e.target.value));
+
 function wirePaste(inputSel, tagSel) {
   const input = qs(inputSel), tag = qs(tagSel);
   if (!input) return;
@@ -810,6 +890,8 @@ function wirePaste(inputSel, tagSel) {
 }
 wirePaste('#home-url', '#home-platform');
 wirePaste('#new-url', '#new-platform');
+wirePaste('#pf-url', '#pf-platform');
+qs('#pf-url').addEventListener('kt-fetch', () => startFetch(qs('#pf-url').value));
 qs('#home-fetch').addEventListener('click', () => startFetch(qs('#home-url').value));
 qs('#home-url').addEventListener('kt-fetch', () => startFetch(qs('#home-url').value));
 qs('#new-fetch').addEventListener('click', () => startFetch(qs('#new-url').value));

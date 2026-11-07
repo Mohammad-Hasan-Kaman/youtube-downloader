@@ -25,6 +25,7 @@
         <div class="nav-group" data-i18n="groupMain"></div>
         <button class="nav-btn" data-page="home"><span class="nav-ico" data-ico="home"></span><span data-i18n="navHome"></span></button>
         <button class="nav-btn" data-page="search"><span class="nav-ico" data-ico="search"></span><span data-i18n="navSearch"></span></button>
+        <button class="nav-btn" data-page="platforms"><span class="nav-ico" data-ico="grid"></span><span data-i18n="navPlatforms"></span></button>
         <button class="nav-btn" data-page="new"><span class="nav-ico" data-ico="plus"></span><span data-i18n="navNew"></span></button>
         <button class="nav-btn" data-page="playlists"><span class="nav-ico" data-ico="playlist"></span><span data-i18n="navPlaylists"></span></button>
         <div class="nav-group" data-i18n="groupLibrary"></div>
@@ -126,6 +127,46 @@
           </div>
           <div class="status-line" id="new-status" hidden></div>
           <div id="new-preview"></div>
+        </section>
+
+        <!-- ======== PLATFORMS ======== -->
+        <section class="page" data-page-panel="platforms">
+          <p class="page-sub" data-i18n="platformsSub"></p>
+          <div class="platform-grid" id="platforms-grid"></div>
+          <button class="platform-card sites-card" id="sites-open">
+            <span class="platform-body"><span class="platform-name" data-i18n="supportedSites"></span>
+            <span class="platform-note" id="sites-count" style="display:block"></span></span>
+          </button>
+        </section>
+
+        <!-- ======== PLATFORM ======== -->
+        <section class="page" data-page-panel="platform">
+          <div class="detail-head">
+            <button class="btn" id="pf-back"><span data-i18n="back"></span></button>
+          </div>
+          <div id="pf-head"></div>
+          <div class="paste-box">
+            <input type="text" id="pf-url" class="url-input" spellcheck="false" />
+            <span class="platform-tag" id="pf-platform" hidden></span>
+            <button class="btn btn-primary" id="pf-fetch" data-i18n="fetchBtn"></button>
+          </div>
+          <div class="pf-actions">
+            <button class="btn" id="pf-search" data-i18n="navSearch" hidden></button>
+            <button class="btn" id="pf-playlists" data-i18n="navPlaylists" hidden></button>
+          </div>
+        </section>
+
+        <!-- ======== SITES ======== -->
+        <section class="page" data-page-panel="sites">
+          <div class="detail-head">
+            <button class="btn" id="sites-back"><span data-i18n="back"></span></button>
+          </div>
+          <p class="page-sub" data-i18n="sitesSub"></p>
+          <div class="search-row">
+            <input type="text" id="sites-filter" class="url-input" spellcheck="false" />
+          </div>
+          <p class="page-sub" id="sites-status"></p>
+          <div class="sites-grid" id="sites-grid"></div>
         </section>
 
         <!-- ======== PLAYLISTS ======== -->

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('kaman', {
   search: (q, proxy) => ipcRenderer.invoke('yt:search', q, proxy),
   info: (url, proxy, opts) => ipcRenderer.invoke('yt:info', url, proxy, opts),
   playlist: (url, proxy, opts) => ipcRenderer.invoke('yt:playlist', url, proxy, opts),
+  extractors: () => ipcRenderer.invoke('yt:extractors'),
   download: (job, proxy) => ipcRenderer.invoke('yt:download', job, proxy),
   cancel: (id) => ipcRenderer.invoke('yt:cancel', id),
   onYtEvent: (cb) => ipcRenderer.on('yt:event', (_e, e) => cb(e)),

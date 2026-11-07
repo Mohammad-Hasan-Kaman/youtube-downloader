@@ -136,6 +136,15 @@ class YtdlpService extends EventEmitter {
     return p;
   }
 
+  /** Every extractor the bundled yt-dlp ships - its supported-sites list. */
+  async extractors() {
+    if (this._extractorsCache) return this._extractorsCache;
+    const stdout = await this._exec(['--list-extractors'], 30000);
+    const names = stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+    this._extractorsCache = names;
+    return names;
+  }
+
   async playlist(url, proxy, opts) {
     const args = this._commonArgs(proxy, ['--dump-single-json', '--flat-playlist', url], opts);
     const stdout = await this._exec(args, 120000);

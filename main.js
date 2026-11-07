@@ -249,6 +249,7 @@ ipcMain.handle('yt:download', async (_e, job, proxy) => {
   }
   return yt.download(job, withProxy(proxy));
 });
+ipcMain.handle('yt:extractors', async () => yt.extractors());
 ipcMain.handle('yt:cancel', (_e, id) => yt.cancel(id));
 
 // Paths

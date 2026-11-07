@@ -117,6 +117,21 @@ async function main() {
   check('adult block settings removed', await ev('!document.querySelector("#s-blockadult") && !document.querySelector("#s-blocked")'));
   const blocked = await ev(`window.kaman.info('https://www.pornhub.com/video/123','',null).then(()=>'NOT-BLOCKED').catch(e=>String(e&&e.message||e))`);
   check('adult site blocked in main', /blocked-by-user-list/.test(String(blocked)), String(blocked).slice(0, 60));
+
+  // v3.1: platforms page has a card per platform; sites page lists the
+  // engine's extractors live; a platform opens its own section
+  await ev(`document.querySelector('[data-page="platforms"]').click()`);
+  await sleep(600);
+  check('platforms grid populated', await ev('document.querySelectorAll("#platforms-grid .platform-card").length>=6'));
+  check('sites count shown', await ev('/\\d/.test(document.querySelector("#sites-count").textContent)'));
+  await ev(`document.querySelector('#platforms-grid .platform-card').click()`);
+  await sleep(400);
+  check('platform section opens', await ev('!!document.querySelector("[data-page-panel=platform].active") && !!document.querySelector("#pf-url")'));
+  await ev(`document.querySelector('[data-page="platforms"]').click()`);
+  await sleep(300);
+  await ev(`document.querySelector('#sites-open').click()`);
+  await sleep(900);
+  check('sites list populated (1000+)', await ev('document.querySelectorAll("#sites-grid .site-chip").length>1000'));
   await shot('v3-settings-dark-fa.png');
   const ytdlp = await ev('document.querySelector("#v-ytdlp").textContent');
   console.log('info  yt-dlp version cell:', ytdlp);
