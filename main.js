@@ -110,7 +110,7 @@ function createWindow(isDev) {
   win = new BrowserWindow({
     width: 1250,
     height: 820,
-    minWidth: 980,
+    minWidth: 860,
     minHeight: 640,
     title: 'KamanTube',
     icon: nativeImage.createFromPath(path.join(__dirname, 'assets', 'icon.png')),

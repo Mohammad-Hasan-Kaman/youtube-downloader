@@ -9,7 +9,7 @@
   --radius: 10px;
   --radius-sm: 7px;
   --sidebar-w: 236px;
-  --topbar-h: 56px;
+  --topbar-h: 64px;
   --font: "Segoe UI", "Vazirmatn", Tahoma, system-ui, sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "SF Mono", monospace;
   --accent: #c8871a;
@@ -118,28 +118,28 @@ html[dir="rtl"] .nav-btn.active { box-shadow: inset -3px 0 0 var(--accent); }
 /* ---------------- Main / topbar ---------------- */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .topbar {
-  height: var(--topbar-h); flex: 0 0 var(--topbar-h);
-  display: flex; align-items: center; gap: 14px;
-  padding: 0 18px; border-bottom: 1px solid var(--border);
+  min-height: var(--topbar-h); flex: 0 0 auto;
+  display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap;
+  padding: 8px 18px; border-bottom: 1px solid var(--border);
   background: var(--bg-raise);
 }
 .page-title { font-size: 15.5px; font-weight: 650; margin: 0; white-space: nowrap; }
-.topbar-end { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; }
+.topbar-end { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .net-chip {
   display: flex; align-items: center; gap: 9px;
-  border: 1px solid var(--border); border-radius: 24px; padding: 5px 13px;
+  border: 1px solid var(--border); border-radius: 24px; padding: 7px 14px;
   background: var(--bg); max-width: 340px;
 }
 .net-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-faint); flex: 0 0 9px; }
 .net-dot.direct { background: var(--ok); }
 .net-dot.tunnel { background: var(--accent); }
 .net-dot.offline { background: var(--err); }
-.net-text { line-height: 1.25; min-width: 0; }
+.net-text { line-height: 1.4; min-width: 0; }
 .net-ip { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
 .net-state { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .seg-btn {
-  background: var(--bg); border: 0; padding: 5px 10px; font-size: 12px; color: var(--text-dim);
+  background: var(--bg); border: 0; padding: 7px 11px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim);
   border-inline-end: 1px solid var(--border);
 }
 .seg-btn:last-child { border-inline-end: 0; }
@@ -305,9 +305,15 @@ textarea { font-family: var(--font-mono); font-size: 12.5px; direction: ltr; tex
 .pl-toolbar { display: flex; gap: 8px; align-items: center; margin: 14px 0 10px; flex-wrap: wrap; }
 
 /* ---------------- Settings / diagnostics / about ---------------- */
-.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)); gap: 16px; align-items: start; margin-top: 6px; }
 fieldset.card { margin: 0; }
-fieldset.card legend { font-weight: 700; font-size: 13.5px; padding: 0 6px; }
+/* Pill legend: the bare straddling legend rendered half-clipped (tall
+ * Persian glyphs, tight line-height) and read as a rendering bug. */
+fieldset.card legend {
+  font-weight: 700; font-size: 13px; line-height: 1.7;
+  padding: 2px 12px; background: var(--bg-raise);
+  border: 1px solid var(--border); border-radius: 999px;
+}
 .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 13px; }
 .field > span { color: var(--text-dim); font-size: 12.5px; }
 .field select, .field input { width: 100%; }
@@ -374,3 +380,27 @@ fieldset.card legend { font-weight: 700; font-size: 13.5px; padding: 0 6px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 6px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------------- v3.1: responsive ----------------
+ * The app used to be a fixed desktop layout: below ~1200px the topbar
+ * squeezed its chip and segment groups together, grids overflowed and
+ * nothing adapted. Breakpoints: roomy -> compact -> icon rail. */
+@media (max-width: 1180px) {
+  .net-chip { max-width: 250px; }
+  .platform-grid { grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+}
+@media (max-width: 1020px) {
+  .sidebar { width: 60px; flex-basis: 60px; padding: 14px 8px; }
+  .nav-btn { justify-content: center; padding: 9px 0; }
+  .nav-btn > span[data-i18n] { display: none; }
+  .nav-btn .badge { margin: 0; }
+  .sidebar-foot { display: none; }
+}
+@media (max-width: 760px) {
+  .page { padding: 16px 14px 32px; }
+  .topbar { padding: 8px 12px; }
+  .net-state { display: none; }
+  .settings-grid { grid-template-columns: 1fr; }
+  .cards { grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr)); }
+  .paste-box, .search-row { flex-wrap: wrap; }
+}
