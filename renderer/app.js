@@ -157,6 +157,8 @@ K.onTunnelStatus((s) => {
   net = { ...net, ...s };
   proxy = s && s.usingTunnel && s.port ? `socks5h://127.0.0.1:${s.port}` : '';
   renderNetChip();
+  // A route appearing can un-stick jobs queued while the tunnel was down.
+  if (s && s.usingTunnel) pump();
 });
 const logLines = [];
 K.onTunnelLog((m) => {
@@ -849,9 +851,15 @@ async function startFetch(raw) {
   skeletonPreview(mount);
   try {
     const opts = accountOpts();
-    let info = null;
-    try { info = await K.info(url, proxy, opts); } catch (_) { info = null; }
-    if (!info) info = await K.playlist(url, proxy, opts);
+    // Ask the endpoint that matches the URL shape first: for a playlist
+    // URL the info call only fails after its full timeout, and that dead
+    // wait used to be paid before the playlist call even started.
+    const tryInfo = async () => { try { return await K.info(url, proxy, opts); } catch (_) { return null; } };
+    const tryPlaylist = async () => { try { return await K.playlist(url, proxy, opts); } catch (_) { return null; } };
+    const looksPlaylist = /[?&]list=/.test(url) || /\/playlist(\/|\?|$)/.test(url);
+    let info = looksPlaylist
+      ? (await tryPlaylist()) || (await tryInfo())
+      : (await tryInfo()) || (await tryPlaylist());
     status.hidden = true;
     mountPreview(mount, info, url);
   } catch (e) {
@@ -1146,6 +1154,11 @@ async function loadVersions() {
   const savedH = await K.settingGet('historyV3').catch(() => null);
   if (Array.isArray(savedH)) { history.push(...savedH); renderHistory(); renderHomeRecent(); }
   updateQueueChrome();
+  // Start whatever the restore brought back: without this, jobs persisted
+  // as 'queued' sat in the queue forever after a restart - every other
+  // pump() call site is an enqueue or a download event that never comes
+  // for a restored job.
+  pump();
   refreshDiagnostics();
   go('home');
 })();
