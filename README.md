@@ -1,3 +1,6 @@
+### 🌐 Telegram: [@mohaka_programmer](https://t.me/mohaka_programmer)
+[![Telegram](https://img.shields.io/badge/Telegram-%40mohaka__programmer-2CA5E0?logo=telegram&logoColor=white)](https://t.me/mohaka_programmer)
+
 # KamanTube — Universal Media Downloader
 
 **Your Media. Your Control. Anywhere.**
