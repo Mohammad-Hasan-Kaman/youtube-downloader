@@ -215,13 +215,11 @@ async function withRouteFallback(fn) {
   }
   throw lastErr || new Error('request failed');
 }
-// Site blocking (user-configured): the built-in adult list ships ON,
-// plus any extra domains the user adds. Enforced here so no code path
-// in the renderer can bypass it.
+// Site blocking: the built-in adult list is always on and cannot be
+// configured by the user (v3.1 product decision). Enforced here so no
+// code path in the renderer can bypass it.
 function assertNotBlocked(url) {
-  const adult = state.get('blockAdult', null) !== false; // default ON
-  const extra = state.get('blockedExtra', '') || '';
-  if (providers.isBlocked(url, { adult, extra })) {
+  if (providers.isBlocked(url)) {
     throw new Error('blocked-by-user-list');
   }
 }

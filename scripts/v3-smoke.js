@@ -109,12 +109,12 @@ async function main() {
   await sleep(200);
   check('explore grid rendered', await ev('document.querySelectorAll("#explore-grid .platform-card").length===5'));
 
-  // settings: account + safety cards exist; blocked site is refused by main
+  // settings: account card exists; the v3.1 always-on adult filter has
+  // NO settings UI (no toggle, no domain list) and main refuses the site
   await ev(`document.querySelector('[data-page="settings"]').click()`);
   await sleep(400);
   check('account mode select', await ev('!!document.querySelector("#s-account-mode")'));
-  check('adult block toggle', await ev('!!document.querySelector("#s-blockadult")'));
-  check('adult block default ON', await ev('document.querySelector("#s-blockadult").checked===true'));
+  check('adult block settings removed', await ev('!document.querySelector("#s-blockadult") && !document.querySelector("#s-blocked")'));
   const blocked = await ev(`window.kaman.info('https://www.pornhub.com/video/123','',null).then(()=>'NOT-BLOCKED').catch(e=>String(e&&e.message||e))`);
   check('adult site blocked in main', /blocked-by-user-list/.test(String(blocked)), String(blocked).slice(0, 60));
   await shot('v3-settings-dark-fa.png');

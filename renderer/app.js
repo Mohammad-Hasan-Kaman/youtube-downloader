@@ -50,7 +50,6 @@ const cfg = {
   theme: 'system', defaultQuality: 'best', concurrency: 2, rateLimitKb: 0,
   subsMode: 'embedded', thumbMode: 'embedded', defaultSubLang: '',
   accountMode: 'off', accountBrowser: 'chrome', cookiesFile: '',
-  blockAdult: true, blockedExtra: '',
 };
 let RTL = true;
 const PLATFORM_COLORS = { youtube: '#e62117', pinterest: '#c8232c', instagram: '#b83a7d', tiktok: '#3aa6a0', x: '#888', web: '#c8871a' };
@@ -236,7 +235,7 @@ function jobOptions(input) {
 }
 /** Instant client-side mirror of the main-process site block. */
 function urlBlocked(url) {
-  return P.isBlocked(url, { adult: cfg.blockAdult !== false, extra: cfg.blockedExtra || '' });
+  return P.isBlocked(url);
 }
 
 function enqueue(input) {
@@ -623,7 +622,12 @@ function mountPreview(mount, info, sourceUrl) {
 
   // quality options: best + audio are always real; heights come from the extractor
   const qList = qs('[data-role="qualities"]', wrap);
-  let chosen = { formatId: 'best', label: T.qualityBest };
+  const quals = (info.qualities || []).slice();
+  // "Best" names the actual top height (owner's request): a bare
+  // "Best quality" hides what will really be downloaded.
+  const topHeight = quals.reduce((m, q) => Math.max(m, q.height || 0), 0);
+  const bestLabel = topHeight ? `${T.qualityBest} (${topHeight}p)` : T.qualityBest;
+  let chosen = { formatId: 'best', label: bestLabel };
   const mkQ = (formatId, label, size) => {
     const b = document.createElement('button');
     b.className = 'q-opt' + (formatId === chosen.formatId ? ' selected' : '');
@@ -635,8 +639,7 @@ function mountPreview(mount, info, sourceUrl) {
     });
     qList.appendChild(b);
   };
-  mkQ('best', T.qualityBest, 0);
-  const quals = (info.qualities || []).slice();
+  mkQ('best', bestLabel, 0);
   if (cfg.defaultQuality !== 'best') {
     const want = Number(cfg.defaultQuality);
     const near = quals.filter((q) => q.height <= want).sort((a, b) => b.height - a.height)[0] || quals[0];
@@ -1033,9 +1036,6 @@ async function loadSettingsIntoForm() {
   qs('#s-sublang').value = cfg.defaultSubLang;
   qs('#s-account-mode').value = cfg.accountMode;
   qs('#s-account-browser').value = cfg.accountBrowser;
-  qs('#s-blockadult').checked = cfg.blockAdult !== false;
-  qs('#s-blocked').value = cfg.blockedExtra || '';
-  qs('#s-blocked').placeholder = T.blockedPh || '';
   renderAccountRows();
   qs('#s-dir-path').textContent = downloadsDir;
   qs('#dir-path').textContent = downloadsDir;
@@ -1066,14 +1066,6 @@ qs('#s-cookies-pick').addEventListener('click', async () => {
     await K.settingSet('cookiesFile', f);
     renderAccountRows();
   }
-});
-qs('#s-blockadult').addEventListener('change', async (e) => {
-  cfg.blockAdult = e.target.checked;
-  await K.settingSet('blockAdult', cfg.blockAdult);
-});
-qs('#s-blocked').addEventListener('change', async (e) => {
-  cfg.blockedExtra = e.target.value;
-  await K.settingSet('blockedExtra', cfg.blockedExtra);
 });
 qs('#s-lang').addEventListener('change', async (e) => {
   const r = await K.langSet(e.target.value);
@@ -1124,7 +1116,7 @@ async function loadVersions() {
   RTL = !!lg.rtl;
   T = lg.strings || {};
   cfg.theme = (await K.themeGet().catch(() => 'dark')) || 'dark';
-  for (const key of ['defaultQuality', 'concurrency', 'rateLimitKb', 'subsMode', 'thumbMode', 'defaultSubLang', 'accountMode', 'accountBrowser', 'cookiesFile', 'blockAdult', 'blockedExtra']) {
+  for (const key of ['defaultQuality', 'concurrency', 'rateLimitKb', 'subsMode', 'thumbMode', 'defaultSubLang', 'accountMode', 'accountBrowser', 'cookiesFile']) {
     const v = await K.settingGet(key).catch(() => null);
     if (v !== null && v !== undefined) cfg[key] = v;
   }

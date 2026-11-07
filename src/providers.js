@@ -146,15 +146,45 @@ function kindOf(url) {
  * The user explicitly asked that downloads from such platforms are
  * refused. Enforced in the main process for every info/playlist/
  * download call, and pre-checked in the renderer for instant feedback.
- * The user can extend it with extra domains and can switch the
- * built-in list off in Settings - but it ships ON.
+ * Product decision (v3.1, at the owner's order): the filter is built
+ * in, comprehensive and ALWAYS on - there is no Settings section for
+ * it and no user control can weaken or extend it.
  */
 const ADULT_HOSTS = [
-  'pornhub.com', 'xvideos.com', 'xnxx.com', 'xhamster.com', 'redtube.com',
-  'youporn.com', 'brazzers.com', 'onlyfans.com', 'chaturbate.com',
-  'livejasmin.com', 'stripchat.com', 'bongacams.com', 'myfreecams.com',
+  // Free tube sites
+  'pornhub.com', 'pornhubpremium.com', 'xvideos.com', 'xnxx.com',
+  'xhamster.com', 'xhamsterlive.com', 'redtube.com', 'youporn.com',
   'spankbang.com', 'eporner.com', 'porntrex.com', 'faphouse.com',
-  'rule34.xxx', 'hentaihaven.xxx', 'hanime.tv',
+  'tube8.com', 'beeg.com', 'txxx.com', 'porndig.com', 'porn.com',
+  'sex.com', 'youjizz.com', 'drtuber.com', 'tnaflix.com', 'empflix.com',
+  'keezmovies.com', 'extremetube.com', 'alphaporno.com', 'sunporno.com',
+  'perfectgirls.net', 'cliphunter.com', 'pornhost.com',
+  'largeporntube.com', 'watchmygf.com', 'porntube.com', 'jizzbunker.com',
+  'fuq.com', 'zbporn.com', 'hqporner.com', 'pornerbros.com',
+  'dinotube.com', 'uflash.com', 'vporn.com', 'nudevista.com',
+  'fapster.com', 'ok.xxx', 'porn300.com', 'motherless.com',
+  'efukt.com', 'imagefap.com', 'heavyr.com', 'xtube.com',
+  // Live cam sites
+  'chaturbate.com', 'livejasmin.com', 'stripchat.com', 'bongacams.com',
+  'myfreecams.com', 'streamate.com', 'camsoda.com', 'flirt4free.com',
+  'liveprivates.com', 'xlovecam.com', 'amateur.tv', 'imlive.com',
+  'cams.com',
+  // Pay / studio / subscription sites
+  'brazzers.com', 'onlyfans.com', 'fansly.com', 'manyvids.com',
+  'clips4sale.com', 'bangbros.com', 'mofos.com', 'realitykings.com',
+  'naughtyamerica.com', 'digitalplayground.com', 'playboy.com',
+  'penthouse.com', 'hustler.com', 'vivid.com', 'wicked.com',
+  'twistys.com', 'babes.com', 'xart.com', 'metart.com', 'nubiles.com',
+  'teamskeet.com', 'fakehub.com', 'letsdoeit.com', 'vixen.com',
+  'blacked.com', 'tushy.com', 'deeper.com', 'slayed.com', 'mylf.com',
+  'evilangel.com', 'kink.com', 'hardx.com', 'elegantangel.com',
+  // Hentai / adult anime & boorus
+  'hanime.tv', 'hentaihaven.xxx', 'rule34.xxx', 'rule34.paheal.net',
+  'nhentai.net', 'e-hentai.org', 'exhentai.org', 'hitomi.la',
+  'fakku.net', 'gelbooru.com', 'xbooru.com', 'danbooru.donmai.us',
+  'hentai2read.com', 'hentai-foundry.com', 'sankakucomplex.com',
+  // Erotica
+  'literotica.com', 'asstr.org',
 ];
 
 function hostBlocked(host, list) {
@@ -162,26 +192,16 @@ function hostBlocked(host, list) {
   return list.some((d) => host === d || host.endsWith('.' + d));
 }
 
-function parseBlockedExtra(text) {
-  return String(text || '')
-    .split(/[\s,;]+/)
-    .map((s) => s.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, ''))
-    .filter(Boolean);
-}
-
-/** opts: { adult: boolean, extra: string|string[] } */
-function isBlocked(url, opts) {
+/** Always-on filter: the built-in list decides, nothing else. */
+function isBlocked(url) {
   const host = hostOf(url);
   if (!host) return false;
-  const o = opts || {};
-  if (o.adult !== false && hostBlocked(host, ADULT_HOSTS)) return true;
-  const extra = Array.isArray(o.extra) ? o.extra : parseBlockedExtra(o.extra);
-  return hostBlocked(host, extra);
+  return hostBlocked(host, ADULT_HOSTS);
 }
 
 const api = {
   PROVIDERS, FALLBACK, detect, getProvider, getCapabilities, canHandle, hostOf,
-  kindOf, ADULT_HOSTS, isBlocked, parseBlockedExtra,
+  kindOf, ADULT_HOSTS, isBlocked,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = api;
 if (typeof window !== 'undefined') window.KamanProviders = api;

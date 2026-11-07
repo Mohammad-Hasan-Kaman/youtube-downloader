@@ -117,8 +117,8 @@ test('kindOf: profile-based platforms and fallback', () => {
 
 /* ---------------------------------------------------------- blocking -- */
 
-test('blocklist: built-in list has 20 hosts and is ON by default', () => {
-  assert.equal(P.ADULT_HOSTS.length, 20);
+test('blocklist: built-in list is comprehensive and ON by default', () => {
+  assert.ok(P.ADULT_HOSTS.length >= 100, `expected 100+ hosts, got ${P.ADULT_HOSTS.length}`);
   assert.equal(P.isBlocked('https://pornhub.com/view_video.php?viewkey=x', {}), true);
   assert.equal(P.isBlocked('https://www.xvideos.com/video123/x', {}), true);
   assert.equal(P.isBlocked('https://pornhub.com/x'), true); // opts omitted entirely
@@ -130,9 +130,9 @@ test('blocklist: subdomains of blocked hosts match, lookalikes do not', () => {
   assert.equal(P.isBlocked('https://pornhub.com.evil.example/x', {}), false);
 });
 
-test('blocklist: built-in list can be switched off, extra list still applies', () => {
-  assert.equal(P.isBlocked('https://pornhub.com/x', { adult: false }), false);
-  assert.equal(P.isBlocked('https://example.org/x', { adult: false, extra: 'example.org' }), true);
+test('blocklist: filter is always on - no opt-out, no user lists (v3.1)', () => {
+  assert.equal(P.isBlocked('https://pornhub.com/x', { adult: false }), true);
+  assert.equal(P.isBlocked('https://example.org/x', { extra: 'example.org' }), false);
 });
 
 test('blocklist: ordinary sites are never blocked by default', () => {
@@ -142,13 +142,10 @@ test('blocklist: ordinary sites are never blocked by default', () => {
   assert.equal(P.isBlocked('', {}), false);
 });
 
-test('blocklist: extra domains accept string or array, with URL-ish input', () => {
-  assert.equal(P.isBlocked('https://foo.com/a', { extra: 'foo.com' }), true);
-  assert.equal(P.isBlocked('https://sub.foo.com/a', { extra: ['foo.com'] }), true);
-  assert.equal(P.isBlocked('https://bar.com/a', { extra: 'foo.com' }), false);
-  assert.deepEqual(
-    P.parseBlockedExtra(' https://www.Foo.com/path, bar.com;  baz.org '),
-    ['foo.com', 'bar.com', 'baz.org']);
-  assert.deepEqual(P.parseBlockedExtra(''), []);
-  assert.deepEqual(P.parseBlockedExtra(null), []);
+test('blocklist: coverage spans tubes, cams, studios and hentai', () => {
+  for (const u of [
+    'https://www.nhentai.net/g/1', 'https://camsoda.com/x',
+    'https://bangbros.com/x', 'https://fansly.com/x',
+    'https://hanime.tv/x', 'https://www.motherless.com/x',
+  ]) assert.equal(P.isBlocked(u), true, u);
 });
