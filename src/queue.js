@@ -81,6 +81,13 @@ function movePriority(jobs, id, dir) {
   return job.priority;
 }
 
-const api = { priorityOf, seqOf, pickNext, takeNext, movePriority };
-if (typeof module !== 'undefined' && module.exports) module.exports = api;
-if (typeof window !== 'undefined') window.KamanQueue = api;
+// NOTE: this file is loaded as a classic <script> in the renderer,
+// where top-level const/let share ONE global lexical scope across all
+// scripts. providers.js already declares `const api` there - naming
+// this one `api` too made the whole script fail with "Identifier 'api'
+// has already been declared", window.KamanQueue stayed undefined, and
+// every pump() in the renderer died on Q.takeNext: jobs queued forever
+// and never downloaded (the v3.0.0 queue bug). Keep this name unique.
+const queueApi = { priorityOf, seqOf, pickNext, takeNext, movePriority };
+if (typeof module !== 'undefined' && module.exports) module.exports = queueApi;
+if (typeof window !== 'undefined') window.KamanQueue = queueApi;

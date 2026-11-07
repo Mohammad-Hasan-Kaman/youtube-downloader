@@ -53,9 +53,10 @@ async function main() {
 
   check('preload bridge (window.kaman)', await ev('!!window.kaman'));
   check('providers registry', await ev('!!window.KamanProviders && window.KamanProviders.detect("https://www.tiktok.com/@x/video/1")==="tiktok"'));
-  check('10 pages mounted', await ev('document.querySelectorAll("[data-page-panel]").length'), await ev('String(document.querySelectorAll("[data-page-panel]").length)'));
+  check('queue registry (v3.1 regression)', await ev('!!window.KamanQueue && typeof window.KamanQueue.takeNext==="function"'));
+  check('panels mounted', await ev('document.querySelectorAll("[data-page-panel]").length>=14'), await ev('String(document.querySelectorAll("[data-page-panel]").length)'));
 
-  for (const p of ['search', 'new', 'playlists', 'queue', 'history', 'library', 'settings', 'diagnostics', 'about', 'home']) {
+  for (const p of ['search', 'platforms', 'new', 'playlists', 'queue', 'history', 'library', 'settings', 'diagnostics', 'about', 'home']) {
     const ok = await ev(`(function(){document.querySelector('[data-page="${p}"]').click();return document.querySelector('[data-page-panel="${p}"]').classList.contains('active');})()`);
     check('route -> ' + p, ok === true);
     await sleep(120);
